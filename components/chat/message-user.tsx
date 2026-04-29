@@ -12,8 +12,8 @@ export function MessageUser({ content, createdAt }: MessageUserProps) {
 
   return (
     <div className="flex justify-end mb-4 group/msg">
-      <div className="flex flex-col items-end gap-1">
-        <div className="bg-zinc-900 dark:bg-zinc-700 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm max-w-[85%] leading-relaxed whitespace-pre-wrap">
+      <div className="flex flex-col items-end gap-1 max-w-[85%]">
+        <div className="bg-zinc-900 dark:bg-zinc-700 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap">
           {content}
         </div>
         {time && (
