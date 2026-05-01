@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Plus, Trash2, Pencil, MoreHorizontal, PanelLeftClose, Settings, Search, X } from "lucide-react";
+import { Plus, Trash2, Pencil, MoreHorizontal, PanelLeftClose, Settings, Search } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { useSidebar } from "@/components/layout/resizable-layout";
 import { Button } from "@/components/ui/button";
@@ -20,15 +20,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { cn, groupByRecency } from "@/lib/utils";
+import { cn, groupByRecency, relativeTime } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Conversation } from "@/types";
 
 interface SidebarProps {
   conversations: Conversation[];
   isLoadingConversations?: boolean;
-  searchQuery?: string;
-  onSearchChange?: (q: string) => void;
   activeId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
@@ -38,23 +36,9 @@ interface SidebarProps {
   userName?: string | null;
   onLogout?: () => void;
   onOpenModal?: (tab: "sync" | "settings") => void;
+  onOpenSearch?: () => void;
 }
 
-function relativeTime(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays === 1) return "yesterday";
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 function ConversationItem({
   conversation,
@@ -319,13 +303,8 @@ function SyncCard({ onViewDetails }: { onViewDetails: () => void }) {
 }
 
 
-export function Sidebar({ conversations, isLoadingConversations, searchQuery = "", onSearchChange, activeId, onSelect, onNew, onDelete, onRename, userEmail, userName, onLogout, onOpenModal }: SidebarProps) {
-  const filtered = searchQuery.trim()
-    ? conversations.filter((c) =>
-        (c.title ?? "New conversation").toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : conversations;
-  const groups = groupByRecency(filtered);
+export function Sidebar({ conversations, isLoadingConversations, activeId, onSelect, onNew, onDelete, onRename, userEmail, userName, onLogout, onOpenModal, onOpenSearch }: SidebarProps) {
+  const groups = groupByRecency(conversations);
   const sidebar = useSidebar();
 
   return (
@@ -359,24 +338,18 @@ export function Sidebar({ conversations, isLoadingConversations, searchQuery = "
 
       <Separator className="bg-zinc-100 dark:bg-zinc-800" />
 
-      {/* Search */}
+      {/* Search trigger */}
       {!isLoadingConversations && conversations.length > 0 && (
         <div className="px-3 py-2">
-          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-zinc-200 dark:border-zinc-700 bg-transparent">
-            <Search className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
-            <input
-              value={searchQuery}
-              onChange={(e) => onSearchChange?.(e.target.value)}
-              onKeyDown={(e) => e.key === "Escape" && onSearchChange?.("")}
-              placeholder="Search..."
-              className="flex-1 text-xs bg-transparent outline-none text-zinc-700 dark:text-zinc-300 placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
-            />
-            {searchQuery && (
-              <button onClick={() => onSearchChange?.("")} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300">
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </div>
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-2 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 font-normal dark:bg-transparent dark:hover:bg-zinc-800"
+            onClick={onOpenSearch}
+          >
+            <Search className="w-4 h-4" />
+            <span className="flex-1 text-left">Search conversations...</span>
+            <kbd className="text-[10px] text-zinc-300 dark:text-zinc-600 font-mono">⌘F</kbd>
+          </Button>
         </div>
       )}
 
@@ -396,28 +369,9 @@ export function Sidebar({ conversations, isLoadingConversations, searchQuery = "
             <p className="text-xs text-zinc-400 dark:text-zinc-500 px-3 pt-4 text-center">
               No conversations yet
             </p>
-          ) : filtered.length === 0 ? (
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 px-3 pt-4 text-center">
-              No matches
-            </p>
           ) : null}
 
-          {!isLoadingConversations && searchQuery.trim() && filtered.length > 0 && (
-            <>
-              {filtered.map((c) => (
-                <ConversationItem
-                  key={c.id}
-                  conversation={c}
-                  isActive={c.id === activeId}
-                  onSelect={() => onSelect(c.id)}
-                  onDelete={() => onDelete(c.id)}
-                  onRename={(title) => onRename(c.id, title)}
-                />
-              ))}
-            </>
-          )}
-
-          {!isLoadingConversations && !searchQuery.trim() && (
+          {!isLoadingConversations && (
             <>
               {groups.today.length > 0 && (
                 <>

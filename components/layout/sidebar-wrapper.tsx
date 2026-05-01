@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Sidebar } from "@/components/layout/sidebar";
 import { AccountModal } from "@/components/layout/account-modal";
+import { SearchModal } from "@/components/layout/search-modal";
 import type { Conversation } from "@/types";
 
 export function SidebarWrapper() {
@@ -12,7 +13,7 @@ export function SidebarWrapper() {
   const pathname = usePathname();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -92,6 +93,10 @@ export function SidebarWrapper() {
         e.preventDefault();
         handleNew();
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
@@ -137,8 +142,6 @@ export function SidebarWrapper() {
       <Sidebar
         conversations={conversations}
         isLoadingConversations={isLoadingConversations}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
         activeId={activeId}
         onSelect={handleSelect}
         onNew={handleNew}
@@ -148,6 +151,7 @@ export function SidebarWrapper() {
         userName={userName}
         onLogout={handleLogout}
         onOpenModal={(tab) => { setModalTab(tab); setModalOpen(true); }}
+        onOpenSearch={() => setIsSearchOpen(true)}
       />
       {userEmail && (
         <AccountModal
@@ -158,6 +162,12 @@ export function SidebarWrapper() {
           defaultTab={modalTab}
         />
       )}
+      <SearchModal
+        open={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        conversations={conversations}
+        onSelect={handleSelect}
+      />
     </>
   );
 }
