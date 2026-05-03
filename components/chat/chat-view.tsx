@@ -139,6 +139,14 @@ function parseStreamLine(
     return { updated, done: true };
   }
 
+  if (line.startsWith("f:")) {
+    try {
+      const payload = JSON.parse(line.slice(2)) as { followups: string[] };
+      if (Array.isArray(payload.followups)) updated.followups = payload.followups;
+    } catch {}
+    return { updated, done: false };
+  }
+
   if (line.startsWith("d:")) {
     return { updated, done: true };
   }
@@ -737,6 +745,11 @@ export function ChatView({ conversationId }: ChatViewProps) {
                   onRetry={
                     msg.id === lastAgentMsgId && (msg.content as AgentMessage).error
                       ? () => handleSubmit(lastQuestionRef.current)
+                      : undefined
+                  }
+                  onFollowup={
+                    msg.id === lastAgentMsgId && !isLoading
+                      ? handleSubmit
                       : undefined
                   }
                 />

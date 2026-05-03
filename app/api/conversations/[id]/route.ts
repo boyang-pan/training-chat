@@ -52,9 +52,14 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
+  const { title, pinned } = body;
+  const updates: Record<string, unknown> = {};
+  if (title !== undefined) updates.title = title;
+  if (pinned !== undefined) updates.pinned = pinned;
+
   const { data, error } = await supabaseAdmin
     .from("conversations")
-    .update({ title: body.title })
+    .update(updates)
     .eq("id", id)
     .eq("user_id", user.id)
     .select()

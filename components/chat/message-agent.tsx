@@ -14,6 +14,7 @@ interface MessageAgentProps {
   isStreaming?: boolean;
   createdAt?: string;
   onRetry?: () => void;
+  onFollowup?: (question: string) => void;
 }
 
 function PreBlock({ children }: { children: React.ReactNode }) {
@@ -43,7 +44,7 @@ function PreBlock({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function MessageAgent({ message, isStreaming, createdAt, onRetry }: MessageAgentProps) {
+export function MessageAgent({ message, isStreaming, createdAt, onRetry, onFollowup }: MessageAgentProps) {
   const [copied, setCopied] = useState(false);
   const time = createdAt
     ? new Date(createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
@@ -179,6 +180,21 @@ export function MessageAgent({ message, isStreaming, createdAt, onRetry }: Messa
               Try again
             </button>
           )}
+        </div>
+      )}
+
+      {/* Follow-up suggestions */}
+      {!isStreaming && !message.error && message.followups && message.followups.length > 0 && onFollowup && (
+        <div className="flex flex-wrap gap-2 mt-4">
+          {message.followups.map((q) => (
+            <button
+              key={q}
+              onClick={() => onFollowup(q)}
+              className="text-xs px-3 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+            >
+              {q}
+            </button>
+          ))}
         </div>
       )}
     </div>

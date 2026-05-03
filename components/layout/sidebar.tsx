@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Plus, Trash2, Pencil, MoreHorizontal, PanelLeftClose, Settings, Search } from "lucide-react";
+import { Plus, Trash2, Pencil, MoreHorizontal, PanelLeftClose, Settings, Search, Pin } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { useSidebar } from "@/components/layout/resizable-layout";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ interface SidebarProps {
   onLogout?: () => void;
   onOpenModal?: (tab: "sync" | "settings") => void;
   onOpenSearch?: () => void;
+  onPin?: (id: string, pinned: boolean) => void;
 }
 
 
@@ -46,12 +47,14 @@ function ConversationItem({
   onSelect,
   onDelete,
   onRename,
+  onPin,
 }: {
   conversation: Conversation;
   isActive: boolean;
   onSelect: () => void;
   onDelete: () => void;
   onRename: (title: string) => void;
+  onPin?: (pinned: boolean) => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(conversation.title ?? "");
@@ -108,17 +111,22 @@ function ConversationItem({
         ) : (
           <Tooltip>
             <TooltipTrigger asChild>
-              <p
-                className={cn(
-                  "text-sm truncate leading-snug",
-                  isActive
-                    ? "font-medium text-zinc-900 dark:text-zinc-100"
-                    : "font-normal text-zinc-700 dark:text-zinc-300",
-                  !conversation.title && "italic text-zinc-400 dark:text-zinc-500"
+              <div className="flex items-center gap-1 min-w-0">
+                {conversation.pinned && (
+                  <Pin className="w-2.5 h-2.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
                 )}
-              >
-                {conversation.title ?? "New conversation"}
-              </p>
+                <p
+                  className={cn(
+                    "text-sm truncate leading-snug",
+                    isActive
+                      ? "font-medium text-zinc-900 dark:text-zinc-100"
+                      : "font-normal text-zinc-700 dark:text-zinc-300",
+                    !conversation.title && "italic text-zinc-400 dark:text-zinc-500"
+                  )}
+                >
+                  {conversation.title ?? "New conversation"}
+                </p>
+              </div>
             </TooltipTrigger>
             <TooltipContent side="right" className="max-w-[220px]">
               {conversation.title ?? "New conversation"}
@@ -147,6 +155,12 @@ function ConversationItem({
               <Pencil className="w-3.5 h-3.5" />
               Rename
             </DropdownMenuItem>
+            {onPin && (
+              <DropdownMenuItem onSelect={() => onPin(!conversation.pinned)}>
+                <Pin className="w-3.5 h-3.5" />
+                {conversation.pinned ? "Unpin" : "Pin"}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onSelect={() => setShowDeleteDialog(true)} destructive>
               <Trash2 className="w-3.5 h-3.5" />
               Delete
@@ -303,8 +317,10 @@ function SyncCard({ onViewDetails }: { onViewDetails: () => void }) {
 }
 
 
-export function Sidebar({ conversations, isLoadingConversations, activeId, onSelect, onNew, onDelete, onRename, userEmail, userName, onLogout, onOpenModal, onOpenSearch }: SidebarProps) {
-  const groups = groupByRecency(conversations);
+export function Sidebar({ conversations, isLoadingConversations, activeId, onSelect, onNew, onDelete, onRename, userEmail, userName, onLogout, onOpenModal, onOpenSearch, onPin }: SidebarProps) {
+  const pinned = conversations.filter((c) => c.pinned);
+  const unpinned = conversations.filter((c) => !c.pinned);
+  const groups = groupByRecency(unpinned);
   const sidebar = useSidebar();
 
   return (
@@ -374,6 +390,23 @@ export function Sidebar({ conversations, isLoadingConversations, activeId, onSel
 
           {!isLoadingConversations && (
             <>
+              {pinned.length > 0 && (
+                <>
+                  <GroupLabel label="Pinned" />
+                  {pinned.map((c) => (
+                    <ConversationItem
+                      key={c.id}
+                      conversation={c}
+                      isActive={c.id === activeId}
+                      onSelect={() => onSelect(c.id)}
+                      onDelete={() => onDelete(c.id)}
+                      onRename={(title) => onRename(c.id, title)}
+                      onPin={onPin ? (p) => onPin(c.id, p) : undefined}
+                    />
+                  ))}
+                </>
+              )}
+
               {groups.today.length > 0 && (
                 <>
                   <GroupLabel label="Today" />
@@ -385,6 +418,7 @@ export function Sidebar({ conversations, isLoadingConversations, activeId, onSel
                       onSelect={() => onSelect(c.id)}
                       onDelete={() => onDelete(c.id)}
                       onRename={(title) => onRename(c.id, title)}
+                      onPin={onPin ? (p) => onPin(c.id, p) : undefined}
                     />
                   ))}
                 </>
@@ -401,6 +435,7 @@ export function Sidebar({ conversations, isLoadingConversations, activeId, onSel
                       onSelect={() => onSelect(c.id)}
                       onDelete={() => onDelete(c.id)}
                       onRename={(title) => onRename(c.id, title)}
+                      onPin={onPin ? (p) => onPin(c.id, p) : undefined}
                     />
                   ))}
                 </>
@@ -417,6 +452,7 @@ export function Sidebar({ conversations, isLoadingConversations, activeId, onSel
                       onSelect={() => onSelect(c.id)}
                       onDelete={() => onDelete(c.id)}
                       onRename={(title) => onRename(c.id, title)}
+                      onPin={onPin ? (p) => onPin(c.id, p) : undefined}
                     />
                   ))}
                 </>

@@ -7,8 +7,9 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("conversations")
-    .select("id, title, created_at")
+    .select("id, title, created_at, pinned")
     .eq("user_id", user.id)
+    .order("pinned", { ascending: false })
     .order("created_at", { ascending: false });
 
   if (error) return Response.json({ error: error.message }, { status: 500 });

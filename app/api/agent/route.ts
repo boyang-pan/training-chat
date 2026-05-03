@@ -1,5 +1,5 @@
 import { anthropic } from "@ai-sdk/anthropic";
-import { stepCountIs } from "ai";
+import { stepCountIs, generateText } from "ai";
 import { createAgentTools } from "@/lib/agent/tools";
 import { SYSTEM_PROMPT } from "@/lib/agent/system-prompt";
 import { supabaseAdmin } from "@/lib/supabase/client";
@@ -146,6 +146,7 @@ export async function POST(request: Request) {
         const maxAttempts = 3;
         let lastErr: unknown;
         let incompleteResponse = false;
+        let completedSuccessfully = false;
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           if (attempt > 0) {
             console.log(`[agent] retrying Phase 2 (attempt ${attempt + 1})...`);
@@ -174,7 +175,7 @@ export async function POST(request: Request) {
                 if (hasToolResults && !hasText) {
                   incompleteResponse = true;
                 } else {
-                  line = `d:{}\n`;
+                  completedSuccessfully = true;
                 }
               }
 
@@ -193,6 +194,26 @@ export async function POST(request: Request) {
             console.error(`[agent] Phase 2 attempt ${attempt + 1} failed:`, msg);
             if (!isTransient) break; // don't retry non-transient errors
           }
+        }
+
+        if (completedSuccessfully) {
+          try {
+            const res = await generateText({
+              model: anthropic("claude-sonnet-4-6"),
+              prompt: `The user asked about their Strava training data: "${question}"\n\nSuggest 3 short follow-up questions they might naturally ask next (under 60 characters each). Output ONLY a JSON array of 3 strings with no other text. Example: ["How did I do last week?", "What's my longest run?", "Am I improving?"]`,
+              maxOutputTokens: 150,
+            });
+            const match = res.text.match(/\[[\s\S]*\]/);
+            if (match) {
+              const parsed = JSON.parse(match[0]);
+              if (Array.isArray(parsed)) {
+                controller.enqueue(encoder.encode(`f:${JSON.stringify({ followups: parsed.slice(0, 3) })}\n`));
+              }
+            }
+          } catch {
+            // skip follow-ups if generation fails
+          }
+          controller.enqueue(encoder.encode(`d:{}\n`));
         }
 
         if (lastErr || incompleteResponse) {

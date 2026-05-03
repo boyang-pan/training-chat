@@ -43,12 +43,14 @@ export interface AgentMessage {
   final_answer: string;
   duration_ms?: number;
   error?: boolean;
+  followups?: string[];
 }
 
 export interface Conversation {
   id: string;
   title: string | null;
   created_at: string;
+  pinned?: boolean;
 }
 
 export interface Message {

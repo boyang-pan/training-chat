@@ -131,6 +131,19 @@ export function SidebarWrapper() {
     });
   }
 
+  async function handlePin(id: string, pinned: boolean) {
+    setConversations((prev) => {
+      const updated = prev.map((c) => (c.id === id ? { ...c, pinned } : c));
+      window.dispatchEvent(new CustomEvent("conversations:updated", { detail: updated }));
+      return updated;
+    });
+    await fetch(`/api/conversations/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned }),
+    });
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push("/login");
@@ -152,6 +165,7 @@ export function SidebarWrapper() {
         onLogout={handleLogout}
         onOpenModal={(tab) => { setModalTab(tab); setModalOpen(true); }}
         onOpenSearch={() => setIsSearchOpen(true)}
+        onPin={handlePin}
       />
       {userEmail && (
         <AccountModal
