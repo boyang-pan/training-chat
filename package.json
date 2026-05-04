@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "eval": "braintrust eval evals/phase1.eval.ts"
+    "eval": "braintrust eval evals/phase1.eval.ts",
+    "snapshot": "npx tsx evals/snapshot.ts",
+    "snapshot:force": "npx tsx evals/snapshot.ts --force"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.64",

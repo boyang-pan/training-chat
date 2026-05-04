@@ -8,9 +8,8 @@ type TraceOutput = {
   turn_count: number | null;
 };
 
-// In replay mode, input IS the trace (task echoes it as output).
-// Scorers read from output; input.question is used for regex-gating.
-type ScorerArgs = { input: TraceOutput; output: TraceOutput };
+// Scorers read trace data from output. input only needs .question for regex-gating.
+type ScorerArgs = { input: { question: string }; output: TraceOutput };
 
 // 1. get_schema must appear before first run_query
 export function schemaBeforeQuery({ output }: ScorerArgs): number | null {
@@ -52,4 +51,57 @@ export function unitConversionInSQL({ input, output }: ScorerArgs): number | nul
   if (queries.length === 0) return null;
 
   return queries.some((sql) => CONVERSION_RE.test(sql)) ? 1 : 0;
+}
+
+// 5. PR questions must use get_personal_records(), not raw SQL against the personal_records table.
+// The pre-computed table exists precisely so the agent doesn't recompute PRs from scratch.
+const PR_QUESTION_RE = /\b(personal\s+record|all[- ]time|fastest\s+ever|best\s+ever|\bprs?\b|\bpb\b)\b/i;
+
+export function usesPersonalRecordsTool({ input, output }: ScorerArgs): number | null {
+  if (!PR_QUESTION_RE.test(input.question)) return null;
+  return output.tool_calls.map((tc) => tc.tool).includes("get_personal_records") ? 1 : 0;
+}
+
+// 6. Fitness/form questions must use get_training_load(), not manual CTL/ATL SQL.
+const TRAINING_LOAD_RE =
+  /\b(fitness|fatigue|form|ctl|atl|tsb|acwr|overtraining?|readiness|ready\s+to\s+race|injury\s+risk|training\s+load)\b/i;
+
+export function usesTrainingLoadTool({ input, output }: ScorerArgs): number | null {
+  if (!TRAINING_LOAD_RE.test(input.question)) return null;
+  return output.tool_calls.map((tc) => tc.tool).includes("get_training_load") ? 1 : 0;
+}
+
+// 7. render_chart must never be the last action — the system prompt requires text analysis after every chart.
+export function chartIsNotFinalAction({ output }: ScorerArgs): number | null {
+  const tools = output.tool_calls.map((tc) => tc.tool);
+  if (!tools.includes("render_chart")) return null;
+
+  const lastChartIndex = tools.lastIndexOf("render_chart");
+  const chartIsLast = lastChartIndex === tools.length - 1;
+  const hasTextAfter =
+    typeof output.final_answer === "string" && output.final_answer.trim().length > 0;
+
+  return !chartIsLast && hasTextAfter ? 1 : 0;
+}
+
+// 8. Questions referencing notes must call get_notes() — cross-session memory only works if it's queried.
+const NOTES_QUESTION_RE =
+  /\b(notes?|wrote|journal|context|remember|recall|i\s+mentioned|i\s+said)\b/i;
+
+export function usesNotesTool({ input, output }: ScorerArgs): number | null {
+  if (!NOTES_QUESTION_RE.test(input.question)) return null;
+  return output.tool_calls.map((tc) => tc.tool).includes("get_notes") ? 1 : 0;
+}
+
+// 9. Segment questions that run SQL must query segment_efforts, not activities.
+const SEGMENT_QUESTION_RE = /\b(segment|kom|strava\s+segment|segment\s+effort|leaderboard)\b/i;
+const SEGMENT_TABLE_RE = /\bsegment_efforts\b/i;
+
+export function segmentQueryUsesSegmentEfforts({ input, output }: ScorerArgs): number | null {
+  if (!SEGMENT_QUESTION_RE.test(input.question)) return null;
+  const queries = output.tool_calls
+    .filter((tc) => tc.tool === "run_query")
+    .map((tc) => (tc.input as { sql: string }).sql ?? "");
+  if (queries.length === 0) return null; // no SQL run — no penalty
+  return queries.some((sql) => SEGMENT_TABLE_RE.test(sql)) ? 1 : 0;
 }

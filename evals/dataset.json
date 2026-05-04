@@ -1,0 +1,156 @@
+[
+  {
+    "id": "simple-recent-run",
+    "category": "simple_activity",
+    "question": "What was my most recent run?",
+    "tags": ["schema", "query"],
+    "notes": "Baseline: schema then run_query. Should return name, date, distance, pace."
+  },
+  {
+    "id": "simple-longest-ride",
+    "category": "simple_activity",
+    "question": "What is my longest bike ride ever?",
+    "tags": ["schema", "query"],
+    "notes": "Tests basic ORDER BY distance_meters DESC with type = Ride filter."
+  },
+  {
+    "id": "simple-activity-detail",
+    "category": "simple_activity",
+    "question": "Tell me about my last workout run — what were the stats?",
+    "tags": ["schema", "query", "activity_detail"],
+    "notes": "Likely triggers get_activity_detail on the identified activity_id."
+  },
+  {
+    "id": "time-range-weekly-mileage",
+    "category": "time_range_aggregation",
+    "question": "How many kilometers did I run each week over the last 8 weeks?",
+    "tags": ["schema", "query"],
+    "notes": "Requires DATE_TRUNC('week') GROUP BY and distance_meters / 1000 conversion."
+  },
+  {
+    "id": "time-range-monthly-volume",
+    "category": "time_range_aggregation",
+    "question": "How has my total training volume (runs + rides) changed month by month this year?",
+    "tags": ["schema", "query"],
+    "notes": "Multi-type aggregation with DATE_TRUNC('month')."
+  },
+  {
+    "id": "time-range-suffer-score-trend",
+    "category": "time_range_aggregation",
+    "question": "Show me my total suffer score by week for the past 3 months.",
+    "tags": ["schema", "query"],
+    "notes": "Tests SUM(suffer_score) with null handling and weekly bucketing."
+  },
+  {
+    "id": "pace-last-5-runs",
+    "category": "pace_speed",
+    "question": "What was my average pace for each of my last 5 runs?",
+    "tags": ["schema", "query", "pace"],
+    "notes": "Must use 1000/(average_speed_mps*60) conversion in SQL."
+  },
+  {
+    "id": "pace-fastest-recent",
+    "category": "pace_speed",
+    "question": "What is my fastest pace on a run in the last 6 months?",
+    "tags": ["schema", "query", "pace"],
+    "notes": "Tests MAX(average_speed_mps) with 1000/... conversion for display."
+  },
+  {
+    "id": "pace-improvement-trend",
+    "category": "pace_speed",
+    "question": "Has my running pace improved over the past year? Show monthly average pace.",
+    "tags": ["schema", "query", "pace"],
+    "notes": "AVG pace per month — conversion must appear in SELECT list."
+  },
+  {
+    "id": "pr-personal-records-all",
+    "category": "personal_records",
+    "question": "What are all my personal records?",
+    "tags": ["pr"],
+    "notes": "Must call get_personal_records(), NOT run_query against personal_records table."
+  },
+  {
+    "id": "pr-fastest-pace",
+    "category": "personal_records",
+    "question": "What is my fastest race pace ever?",
+    "tags": ["pr"],
+    "notes": "get_personal_records() should surface fastest_run_pace metric."
+  },
+  {
+    "id": "training-load-current",
+    "category": "training_load",
+    "question": "What is my current fitness level and am I ready to race?",
+    "tags": ["training_load"],
+    "notes": "get_training_load() must be called. CTL/TSB/form_label should appear in answer."
+  },
+  {
+    "id": "training-load-fatigue",
+    "category": "training_load",
+    "question": "Am I overtraining right now?",
+    "tags": ["training_load"],
+    "notes": "ATL vs CTL comparison, ACWR check. get_training_load() required."
+  },
+  {
+    "id": "training-load-history-chart",
+    "category": "training_load",
+    "question": "Show me my CTL fitness trend over the past 90 days.",
+    "tags": ["training_load", "chart"],
+    "notes": "get_training_load(days=90) + render_chart + text analysis. Tests both load and chart scorers."
+  },
+  {
+    "id": "chart-weekly-mileage-bar",
+    "category": "trend_chart",
+    "question": "Plot my weekly running mileage as a bar chart for the last 12 weeks.",
+    "tags": ["schema", "query", "chart"],
+    "notes": "render_chart must NOT be the final action — text analysis must follow."
+  },
+  {
+    "id": "chart-heartrate-trend",
+    "category": "trend_chart",
+    "question": "Show me a chart of my average heart rate on easy runs over the past 6 months.",
+    "tags": ["schema", "query", "chart"],
+    "notes": "Line chart expected. workout_type=0 filter. render_chart not final."
+  },
+  {
+    "id": "notes-recent-context",
+    "category": "context_notes",
+    "question": "What notes have I added about my training recently?",
+    "tags": ["notes"],
+    "notes": "Must call get_notes(). Tests that notes path is exercised."
+  },
+  {
+    "id": "notes-explain-anomaly",
+    "category": "context_notes",
+    "question": "My suffer scores were very low last month. Did I add any notes explaining why?",
+    "tags": ["schema", "query", "notes"],
+    "notes": "Dual path: run_query for suffer_score data + get_notes for context."
+  },
+  {
+    "id": "segment-most-ridden",
+    "category": "segment_analysis",
+    "question": "Which Strava segments have I ridden the most times, and what is my best time on each?",
+    "tags": ["schema", "query", "segment"],
+    "notes": "GROUP BY segment_id, MIN(elapsed_time), COUNT(*) from segment_efforts."
+  },
+  {
+    "id": "multi-aerobic-efficiency",
+    "category": "multi_metric",
+    "question": "How has my aerobic efficiency on easy runs changed over the past year? Show it weekly.",
+    "tags": ["schema", "query", "chart"],
+    "notes": "AVG(speed/HR) per week for workout_type=0 runs. Likely triggers chart."
+  },
+  {
+    "id": "multi-ride-vs-run-load",
+    "category": "multi_metric",
+    "question": "Compare my running and cycling training loads over the last 60 days — volume, suffer score, and elevation.",
+    "tags": ["schema", "query", "training_load"],
+    "notes": "Multi-type aggregation. May combine run_query + get_training_load."
+  },
+  {
+    "id": "multi-race-performance",
+    "category": "multi_metric",
+    "question": "Show all my races — distance, pace, heart rate, and suffer score — sorted by date.",
+    "tags": ["schema", "query", "pace"],
+    "notes": "workout_type=1 filter. Pace conversion in SQL. Multiple columns."
+  }
+]
