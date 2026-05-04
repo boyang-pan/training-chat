@@ -52,6 +52,7 @@ Two-phase approach per user turn:
 | `get_personal_records()` | Pre-computed PRs from `personal_records` table. |
 | `get_notes(start_date?, end_date?)` | User notes from `activity_notes` (cross-session memory). |
 | `add_note(content, activity_id?, note_date?)` | Write a note. Only with explicit user confirmation. |
+| `get_training_load(days?)` | Computes CTL/ATL/TSB/ACWR via EMA. Uses `suffer_score`; falls back to `moving_time_seconds / 60` when HR data is absent. Returns `{ current, series[] }`. |
 | `render_chart(...)` | Emits a `ChartPayload` for the frontend to render. Must always be followed by text analysis. |
 | `ask_user(question)` | Clarifying question mid-reasoning. Used sparingly. |
 

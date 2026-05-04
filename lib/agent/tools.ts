@@ -1,6 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/client";
+import { computeTrainingLoad } from "@/lib/agent/training-load";
 import type { ChartPayload } from "@/types";
 
 /**
@@ -239,6 +240,34 @@ export function createAgentTools(userId: string) {
       }),
       execute: async (params) => {
         return params as ChartPayload;
+      },
+    }),
+
+    get_training_load: tool({
+      description:
+        "Computes Chronic Training Load (CTL = fitness), Acute Training Load (ATL = fatigue), Training Stress Balance (TSB = form), and Acute:Chronic Workload Ratio (ACWR = injury risk). Uses suffer_score as the load proxy; falls back to activity duration in minutes for activities without HR data. Returns current values plus a time series suitable for charting with render_chart.",
+      inputSchema: z.object({
+        days: z
+          .number()
+          .optional()
+          .describe("Number of trailing days to include in the series (default 90, max 365)"),
+      }),
+      execute: async ({ days = 90 }: { days?: number }) => {
+        const returnDays = Math.min(Math.max(days, 1), 365);
+        // Fetch a long window so the EMA is well-seeded before the return period starts.
+        // CTL time constant is 42 days — we want at least 180 days of warm-up.
+        const seedDays = Math.max(returnDays + 180, 365);
+        const since = new Date(Date.now() - seedDays * 24 * 60 * 60 * 1000).toISOString();
+
+        const { data, error } = await supabaseAdmin
+          .from("activities")
+          .select("start_date, suffer_score, moving_time_seconds")
+          .eq("user_id", userId)
+          .gte("start_date", since)
+          .order("start_date", { ascending: true });
+
+        if (error) return { error: error.message };
+        return computeTrainingLoad(data ?? [], returnDays);
       },
     }),
 
