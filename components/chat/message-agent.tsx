@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, memo } from "react";
 import { Copy, Check, RotateCcw } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -44,7 +44,7 @@ function PreBlock({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function MessageAgent({ message, isStreaming, createdAt, onRetry, onFollowup }: MessageAgentProps) {
+export const MessageAgent = memo(function MessageAgent({ message, isStreaming, createdAt, onRetry, onFollowup }: MessageAgentProps) {
   const [copied, setCopied] = useState(false);
   const time = createdAt
     ? new Date(createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
@@ -199,4 +199,4 @@ export function MessageAgent({ message, isStreaming, createdAt, onRetry, onFollo
       )}
     </div>
   );
-}
+});

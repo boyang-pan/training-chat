@@ -1,11 +1,13 @@
 "use client";
 
+import { memo } from "react";
+
 interface MessageUserProps {
   content: string;
   createdAt?: string;
 }
 
-export function MessageUser({ content, createdAt }: MessageUserProps) {
+export const MessageUser = memo(function MessageUser({ content, createdAt }: MessageUserProps) {
   const time = createdAt
     ? new Date(createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     : null;
@@ -24,4 +26,4 @@ export function MessageUser({ content, createdAt }: MessageUserProps) {
       </div>
     </div>
   );
-}
+});

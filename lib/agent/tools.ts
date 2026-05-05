@@ -1,8 +1,11 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/client";
-import { computeTrainingLoad } from "@/lib/agent/training-load";
+import { computeTrainingLoad, type TrainingLoadResult } from "@/lib/agent/training-load";
 import type { ChartPayload } from "@/types";
+
+const trainingLoadCache = new Map<string, { result: TrainingLoadResult; ts: number }>();
+const TRAINING_LOAD_CACHE_TTL = 5 * 60 * 1000;
 
 /**
  * Factory that creates agent tools scoped to a specific user.
@@ -254,6 +257,10 @@ export function createAgentTools(userId: string) {
       }),
       execute: async ({ days = 90 }: { days?: number }) => {
         const returnDays = Math.min(Math.max(days, 1), 365);
+        const cacheKey = `${userId}:${returnDays}`;
+        const hit = trainingLoadCache.get(cacheKey);
+        if (hit && Date.now() - hit.ts < TRAINING_LOAD_CACHE_TTL) return hit.result;
+
         // Fetch a long window so the EMA is well-seeded before the return period starts.
         // CTL time constant is 42 days — we want at least 180 days of warm-up.
         const seedDays = Math.max(returnDays + 180, 365);
@@ -267,7 +274,9 @@ export function createAgentTools(userId: string) {
           .order("start_date", { ascending: true });
 
         if (error) return { error: error.message };
-        return computeTrainingLoad(data ?? [], returnDays);
+        const result = computeTrainingLoad(data ?? [], returnDays);
+        trainingLoadCache.set(cacheKey, { result, ts: Date.now() });
+        return result;
       },
     }),
 

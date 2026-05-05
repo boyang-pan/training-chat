@@ -220,6 +220,10 @@ export function ChatView({ conversationId }: ChatViewProps) {
   // Tracks a conversation ID we just created ourselves so the reset
   // effect below doesn't wipe messages when the URL updates to the new ID
   const selfCreatedIdRef = useRef<string | null>(null);
+  // RAF batching for streaming updates — avoids calling setMessages on every chunk
+  const pendingMsgUpdateRef = useRef<{ id: string; msg: AgentMessage } | null>(null);
+  const rafScheduledRef = useRef(false);
+  const streamingActiveRef = useRef(false);
 
   // Keep conversationsRef up-to-date from the sidebar broadcast — no title fetch needed
   useEffect(() => {
@@ -439,6 +443,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
       }
 
       let currentAgentMsg: AgentMessage = { ...initialAgentMsg };
+      streamingActiveRef.current = true;
 
       // Seed the per-conversation cache so navigation away doesn't lose this stream
       if (convId) {
@@ -485,17 +490,31 @@ export function ChatView({ conversationId }: ChatViewProps) {
                 )
               );
             }
-            // Only update React state when the user is currently viewing this conversation.
+            // Batch React state updates to RAF cadence (~60fps) — the stream cache
+            // above stays current synchronously so navigation still sees live state.
             if (convId === activeConvIdRef.current) {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === agentMsgId ? { ...m, content: { ...currentAgentMsg } } : m
-                )
-              );
+              pendingMsgUpdateRef.current = { id: agentMsgId, msg: { ...currentAgentMsg } };
+              if (!rafScheduledRef.current) {
+                rafScheduledRef.current = true;
+                requestAnimationFrame(() => {
+                  rafScheduledRef.current = false;
+                  if (!streamingActiveRef.current) return;
+                  const pending = pendingMsgUpdateRef.current;
+                  if (pending && convId === activeConvIdRef.current) {
+                    setMessages((prev) =>
+                      prev.map((m) => (m.id === pending.id ? { ...m, content: pending.msg } : m))
+                    );
+                  }
+                });
+              }
             }
             if (streamDone) break;
           }
         }
+
+        // Stop RAF batching — final state is applied synchronously below
+        streamingActiveRef.current = false;
+        pendingMsgUpdateRef.current = null;
 
         // Record elapsed time
         const duration_ms = Date.now() - streamStartTime;

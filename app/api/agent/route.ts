@@ -199,7 +199,7 @@ export async function POST(request: Request) {
         if (completedSuccessfully) {
           try {
             const res = await generateText({
-              model: anthropic("claude-sonnet-4-6"),
+              model: anthropic("claude-haiku-4-5-20251001"),
               prompt: `The user asked about their Strava training data: "${question}"\n\nSuggest 3 short follow-up questions they might naturally ask next (under 60 characters each). Output ONLY a JSON array of 3 strings with no other text. Example: ["How did I do last week?", "What's my longest run?", "Am I improving?"]`,
               maxOutputTokens: 150,
             });
