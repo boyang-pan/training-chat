@@ -154,7 +154,7 @@ export const MessageAgent = memo(function MessageAgent({ message, isStreaming, c
           </div>
 
           {!isStreaming && !message.error && (
-            <div className="absolute -bottom-5 inset-x-0 flex items-center justify-between opacity-0 group-hover/answer:opacity-100 transition-opacity">
+            <div className="flex items-center justify-between mt-1.5 h-4 opacity-0 group-hover/answer:opacity-100 transition-opacity">
               {time ? (
                 <span className="text-[11px] text-zinc-400 dark:text-zinc-500 select-none">{time}</span>
               ) : <span />}
@@ -185,7 +185,7 @@ export const MessageAgent = memo(function MessageAgent({ message, isStreaming, c
 
       {/* Follow-up suggestions */}
       {!isStreaming && !message.error && message.followups && message.followups.length > 0 && onFollowup && (
-        <div className="flex flex-wrap gap-2 mt-4">
+        <div className="flex flex-wrap gap-2 mt-3">
           {message.followups.map((q) => (
             <button
               key={q}
