@@ -19,6 +19,7 @@ export async function POST(request: Request) {
 
     const userId = user.id;
     const firstName = user.user_metadata?.first_name as string | undefined;
+    const trainingContext = user.user_metadata?.training_context as string | undefined;
     const agentTools = createAgentTools(userId);
 
     const now = new Date();
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
     const dateContext = `Today's date context: today=${now.toISOString().split("T")[0]}, day_of_week=${now.toLocaleDateString("en-US", { weekday: "long" })}, iso_week_start=${weekStart}, month_start=${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01.`;
 
     const timezoneContext = timezone ? `User's local timezone: ${timezone}. Always convert start_date (stored as UTC) to this timezone when displaying activity times.` : "";
-    const systemPrompt = `${SYSTEM_PROMPT}\n\n${dateContext}\n\n${timezoneContext ? timezoneContext + "\n\n" : ""}${firstName ? `The user's first name is ${firstName}. ` : ""}Current user ID: ${userId}. Always include WHERE user_id = '${userId}' in every SQL query.`;
+    const systemPrompt = `${SYSTEM_PROMPT}\n\n${dateContext}\n\n${timezoneContext ? timezoneContext + "\n\n" : ""}${firstName ? `The user's first name is ${firstName}. ` : ""}${trainingContext ? `About this user's training (goals, constraints, focus): ${trainingContext}\n\n` : ""}Current user ID: ${userId}. Always include WHERE user_id = '${userId}' in every SQL query.`;
 
     const span = logger.startSpan({ name: "agent-turn" });
 
