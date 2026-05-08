@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { Monitor, Sun, Moon } from "lucide-react";
+import { Monitor, Sun, Moon, X } from "lucide-react";
 
 // ---- Types ----
 
@@ -232,52 +232,46 @@ function GeneralSection() {
   );
 }
 
-function ProfileSection({ userEmail }: { userEmail: string }) {
+function ProfileSection({
+  userEmail,
+  firstName, setFirstName,
+  lastName, setLastName,
+  trainingContext, setTrainingContext,
+}: {
+  userEmail: string;
+  firstName: string; setFirstName: (v: string) => void;
+  lastName: string; setLastName: (v: string) => void;
+  trainingContext: string; setTrainingContext: (v: string) => void;
+}) {
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
-
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
   const [nameLoading, setNameLoading] = useState(false);
-  const [nameMsg, setNameMsg] = useState<{ ok: boolean; text: string } | null>(null);
-
-  const [trainingContext, setTrainingContext] = useState("");
   const [contextLoading, setContextLoading] = useState(false);
-  const [contextMsg, setContextMsg] = useState<{ ok: boolean; text: string } | null>(null);
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      const meta = data.user?.user_metadata;
-      setFirstName(meta?.first_name ?? "");
-      setLastName(meta?.last_name ?? "");
-      setTrainingContext(meta?.training_context ?? "");
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   async function handleSaveName(e: React.FormEvent) {
     e.preventDefault();
     setNameLoading(true);
-    setNameMsg(null);
     const first = firstName.trim();
     const last = lastName.trim();
     const { error } = await supabase.auth.updateUser({ data: { first_name: first, last_name: last } });
     if (!error) {
       const fullName = [first, last].filter(Boolean).join(" ") || null;
       window.dispatchEvent(new CustomEvent("user:name-updated", { detail: { name: fullName } }));
+      toast.success("Name saved.");
+    } else {
+      toast.error(error.message);
     }
-    setNameMsg(error ? { ok: false, text: error.message } : { ok: true, text: "Saved." });
     setNameLoading(false);
   }
 
   async function handleSaveContext(e: React.FormEvent) {
     e.preventDefault();
     setContextLoading(true);
-    setContextMsg(null);
     const { error } = await supabase.auth.updateUser({ data: { training_context: trainingContext.trim() } });
-    setContextMsg(error ? { ok: false, text: error.message } : { ok: true, text: "Saved." });
+    if (!error) toast.success("Training context saved.");
+    else toast.error(error.message);
     setContextLoading(false);
   }
 
@@ -305,9 +299,8 @@ function ProfileSection({ userEmail }: { userEmail: string }) {
         <SettingRow label="Email">
           <Input value={userEmail} disabled className="w-56 opacity-60" />
         </SettingRow>
-        <div className="flex items-center gap-3 py-3 border-b border-zinc-100 dark:border-zinc-800/80">
+        <div className="py-3 border-b border-zinc-100 dark:border-zinc-800/80">
           <Button type="submit" size="sm" disabled={nameLoading}>{nameLoading ? "Saving…" : "Save"}</Button>
-          {nameMsg && <p className={`text-xs ${nameMsg.ok ? "text-green-600" : "text-red-500"}`}>{nameMsg.text}</p>}
         </div>
       </form>
 
@@ -327,7 +320,6 @@ function ProfileSection({ userEmail }: { userEmail: string }) {
           <div className="flex items-center gap-3 mt-2">
             <Button type="submit" size="sm" disabled={contextLoading}>{contextLoading ? "Saving…" : "Save"}</Button>
             <span className="text-xs text-zinc-400 dark:text-zinc-500">{trainingContext.length}/1000</span>
-            {contextMsg && <p className={`text-xs ${contextMsg.ok ? "text-green-600" : "text-red-500"}`}>{contextMsg.text}</p>}
           </div>
         </SettingRow>
       </form>
@@ -580,12 +572,42 @@ interface AccountModalProps {
   defaultTab?: "sync" | "settings";
 }
 
+const VALID_SECTIONS: Section[] = ["general", "profile", "data", "account"];
+
 export function AccountModal({ open, onClose, userEmail, onLogout, defaultTab = "sync" }: AccountModalProps) {
   const [section, setSection] = useState<Section>(defaultTab === "sync" ? "data" : "general");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [trainingContext, setTrainingContext] = useState("");
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   useEffect(() => {
-    if (open) setSection(defaultTab === "sync" ? "data" : "general");
+    if (!open) return;
+    // Restore last visited section (except when opened via sync card — that has intent)
+    if (defaultTab === "sync") {
+      setSection("data");
+    } else {
+      const stored = localStorage.getItem("settings-section") as Section | null;
+      setSection(stored && VALID_SECTIONS.includes(stored) ? stored : "general");
+    }
+    // Fetch user metadata once per open so Profile fields are always pre-populated
+    supabase.auth.getUser().then(({ data }) => {
+      const meta = data.user?.user_metadata;
+      setFirstName(meta?.first_name ?? "");
+      setLastName(meta?.last_name ?? "");
+      setTrainingContext(meta?.training_context ?? "");
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultTab]);
+
+  function handleSetSection(s: Section) {
+    setSection(s);
+    localStorage.setItem("settings-section", s);
+  }
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -601,7 +623,7 @@ export function AccountModal({ open, onClose, userEmail, onLogout, defaultTab = 
               {NAV.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => setSection(item.id)}
+                  onClick={() => handleSetSection(item.id)}
                   className={cn(
                     "w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors",
                     section === item.id
@@ -622,13 +644,18 @@ export function AccountModal({ open, onClose, userEmail, onLogout, defaultTab = 
               className="absolute top-5 right-5 p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors z-10"
               aria-label="Close settings"
             >
-              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M11.7816 4.03157C12.0062 3.80702 12.0062 3.44295 11.7816 3.2184C11.5571 2.99385 11.193 2.99385 10.9685 3.2184L7.50005 6.68682L4.03164 3.2184C3.80708 2.99385 3.44301 2.99385 3.21846 3.2184C2.99391 3.44295 2.99391 3.80702 3.21846 4.03157L6.68688 7.49999L3.21846 10.9684C2.99391 11.193 2.99391 11.557 3.21846 11.7816C3.44301 12.0061 3.80708 12.0061 4.03164 11.7816L7.50005 8.31316L10.9685 11.7816C11.193 12.0061 11.5571 12.0061 11.7816 11.7816C12.0062 11.557 12.0062 11.193 11.7816 10.9684L8.31322 7.49999L11.7816 4.03157Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd" />
-              </svg>
+              <X className="w-4 h-4" />
             </button>
             <div className="max-w-xl mx-auto px-10 py-8">
               {section === "general" && <GeneralSection />}
-              {section === "profile" && <ProfileSection userEmail={userEmail} />}
+              {section === "profile" && (
+                <ProfileSection
+                  userEmail={userEmail}
+                  firstName={firstName} setFirstName={setFirstName}
+                  lastName={lastName} setLastName={setLastName}
+                  trainingContext={trainingContext} setTrainingContext={setTrainingContext}
+                />
+              )}
               {section === "data" && <DataSection />}
               {section === "account" && <AccountSection onLogout={onLogout} onClose={onClose} />}
             </div>
