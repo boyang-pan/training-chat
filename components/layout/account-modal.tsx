@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { Monitor, Sun, Moon, X } from "lucide-react";
+import { Monitor, Sun, Moon, X, ChevronLeft } from "lucide-react";
 
 // ---- Types ----
 
@@ -618,6 +618,13 @@ export function AccountModal({ open, onClose, userEmail, onLogout, defaultTab = 
 
           {/* Left sidebar */}
           <div className="w-52 shrink-0 border-r border-zinc-100 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-900/60 flex flex-col py-6 px-3">
+            <button
+              onClick={onClose}
+              className="flex items-center gap-1 text-xs text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors px-3 mb-4"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              Back to chat
+            </button>
             <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 px-3 mb-5">Settings</p>
             <nav className="space-y-0.5">
               {NAV.map((item) => (
