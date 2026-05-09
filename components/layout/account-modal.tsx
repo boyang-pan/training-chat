@@ -15,6 +15,21 @@ import { Monitor, Sun, Moon, X, ChevronLeft } from "lucide-react";
 
 // ---- Types ----
 
+interface UserProfile {
+  date_of_birth?: string | null;
+  weight_kg?: number | null;
+  height_cm?: number | null;
+  preferred_units?: "metric" | "imperial";
+  primary_sport?: "running" | "cycling" | "triathlon" | "other" | null;
+  experience_level?: "beginner" | "intermediate" | "advanced" | null;
+  max_heart_rate?: number | null;
+  goal_type?: "race_prep" | "fitness" | "performance" | "other" | null;
+  goal_event_name?: string | null;
+  goal_event_distance?: string | null;
+  goal_event_date?: string | null;
+  current_injuries?: string | null;
+}
+
 interface SyncJob {
   phase: number;
   status: "running" | "completed" | "failed" | "rate_limited";
@@ -236,19 +251,16 @@ function ProfileSection({
   userEmail,
   firstName, setFirstName,
   lastName, setLastName,
-  trainingContext, setTrainingContext,
 }: {
   userEmail: string;
   firstName: string; setFirstName: (v: string) => void;
   lastName: string; setLastName: (v: string) => void;
-  trainingContext: string; setTrainingContext: (v: string) => void;
 }) {
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
   const [nameLoading, setNameLoading] = useState(false);
-  const [contextLoading, setContextLoading] = useState(false);
 
   async function handleSaveName(e: React.FormEvent) {
     e.preventDefault();
@@ -264,15 +276,6 @@ function ProfileSection({
       toast.error(error.message);
     }
     setNameLoading(false);
-  }
-
-  async function handleSaveContext(e: React.FormEvent) {
-    e.preventDefault();
-    setContextLoading(true);
-    const { error } = await supabase.auth.updateUser({ data: { training_context: trainingContext.trim() } });
-    if (!error) toast.success("Training context saved.");
-    else toast.error(error.message);
-    setContextLoading(false);
   }
 
   return (
@@ -303,17 +306,343 @@ function ProfileSection({
           <Button type="submit" size="sm" disabled={nameLoading}>{nameLoading ? "Saving…" : "Save"}</Button>
         </div>
       </form>
+    </div>
+  );
+}
 
+// ---- Native select shared styling ----
+const selectClass = "h-9 w-56 rounded-md border border-zinc-200 dark:border-zinc-700 bg-transparent px-3 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 appearance-none cursor-pointer";
+
+function AthleticsSection({
+  profile,
+  trainingContext, setTrainingContext,
+  onProfileSaved,
+}: {
+  profile: UserProfile | null;
+  trainingContext: string; setTrainingContext: (v: string) => void;
+  onProfileSaved: (p: UserProfile) => void;
+}) {
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  // Physical stats
+  const [preferredUnits, setPreferredUnits] = useState<"metric" | "imperial">(profile?.preferred_units ?? "metric");
+  const [weightDisplay, setWeightDisplay] = useState(
+    profile?.weight_kg ? String(profile.weight_kg) : ""
+  );
+  const [heightDisplay, setHeightDisplay] = useState(
+    profile?.height_cm ? String(profile.height_cm) : ""
+  );
+  const [dateOfBirth, setDateOfBirth] = useState(profile?.date_of_birth ?? "");
+  const [physLoading, setPhysLoading] = useState(false);
+
+  // Training profile
+  const [primarySport, setPrimarySport] = useState(profile?.primary_sport ?? "");
+  const [experienceLevel, setExperienceLevel] = useState(profile?.experience_level ?? "");
+  const [maxHR, setMaxHR] = useState(profile?.max_heart_rate ? String(profile.max_heart_rate) : "");
+  const [goalType, setGoalType] = useState(profile?.goal_type ?? "");
+  const [goalEventName, setGoalEventName] = useState(profile?.goal_event_name ?? "");
+  const [goalEventDistance, setGoalEventDistance] = useState(profile?.goal_event_distance ?? "");
+  const [goalEventDate, setGoalEventDate] = useState(profile?.goal_event_date ?? "");
+  const [trainingLoading, setTrainingLoading] = useState(false);
+
+  // Notes
+  const [contextLoading, setContextLoading] = useState(false);
+
+  // Sync form state when profile prop changes (e.g. after bootstrap)
+  useEffect(() => {
+    if (!profile) return;
+    setPreferredUnits(profile.preferred_units ?? "metric");
+    setWeightDisplay(profile.weight_kg ? String(profile.weight_kg) : "");
+    setHeightDisplay(profile.height_cm ? String(profile.height_cm) : "");
+    setDateOfBirth(profile.date_of_birth ?? "");
+    setPrimarySport(profile.primary_sport ?? "");
+    setExperienceLevel(profile.experience_level ?? "");
+    setMaxHR(profile.max_heart_rate ? String(profile.max_heart_rate) : "");
+    setGoalType(profile.goal_type ?? "");
+    setGoalEventName(profile.goal_event_name ?? "");
+    setGoalEventDistance(profile.goal_event_distance ?? "");
+    setGoalEventDate(profile.goal_event_date ?? "");
+  }, [profile]);
+
+  // Convert displayed weight/height when units toggle
+  function handleUnitsChange(next: "metric" | "imperial") {
+    const prev = preferredUnits;
+    if (prev === next) return;
+    if (weightDisplay) {
+      const w = parseFloat(weightDisplay);
+      if (!isNaN(w)) {
+        setWeightDisplay(
+          next === "imperial"
+            ? String(Math.round(w * 2.2046 * 10) / 10)
+            : String(Math.round((w / 2.2046) * 10) / 10)
+        );
+      }
+    }
+    if (heightDisplay) {
+      const h = parseFloat(heightDisplay);
+      if (!isNaN(h)) {
+        setHeightDisplay(
+          next === "imperial"
+            ? String(Math.round(h / 2.54 * 10) / 10)
+            : String(Math.round(h * 2.54 * 10) / 10)
+        );
+      }
+    }
+    setPreferredUnits(next);
+  }
+
+  async function saveProfile(patch: Partial<UserProfile>) {
+    const res = await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) {
+      const d = await res.json() as { error?: string };
+      throw new Error(d.error ?? "Failed to save");
+    }
+    const d = await res.json() as { profile: UserProfile };
+    onProfileSaved(d.profile);
+  }
+
+  async function handleSavePhysical(e: React.FormEvent) {
+    e.preventDefault();
+    setPhysLoading(true);
+    try {
+      const weightKg = weightDisplay
+        ? preferredUnits === "imperial"
+          ? Math.round((parseFloat(weightDisplay) / 2.2046) * 10) / 10
+          : parseFloat(weightDisplay)
+        : null;
+      const heightCm = heightDisplay
+        ? preferredUnits === "imperial"
+          ? Math.round(parseFloat(heightDisplay) * 2.54 * 10) / 10
+          : parseFloat(heightDisplay)
+        : null;
+      await saveProfile({
+        date_of_birth: dateOfBirth || null,
+        weight_kg: weightKg,
+        height_cm: heightCm,
+        preferred_units: preferredUnits,
+      });
+      toast.success("Physical stats saved.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    }
+    setPhysLoading(false);
+  }
+
+  async function handleSaveTraining(e: React.FormEvent) {
+    e.preventDefault();
+    setTrainingLoading(true);
+    try {
+      await saveProfile({
+        primary_sport: (primarySport as UserProfile["primary_sport"]) || null,
+        experience_level: (experienceLevel as UserProfile["experience_level"]) || null,
+        max_heart_rate: maxHR ? parseInt(maxHR, 10) : null,
+        goal_type: (goalType as UserProfile["goal_type"]) || null,
+        goal_event_name: goalEventName || null,
+        goal_event_distance: goalEventDistance || null,
+        goal_event_date: goalEventDate || null,
+      });
+      toast.success("Training profile saved.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    }
+    setTrainingLoading(false);
+  }
+
+  async function handleSaveContext(e: React.FormEvent) {
+    e.preventDefault();
+    setContextLoading(true);
+    const { error } = await supabase.auth.updateUser({ data: { training_context: trainingContext.trim() } });
+    if (!error) toast.success("Notes saved.");
+    else toast.error(error.message);
+    setContextLoading(false);
+  }
+
+  const weightLabel = preferredUnits === "imperial" ? "lbs" : "kg";
+  const heightLabel = preferredUnits === "imperial" ? "in" : "cm";
+
+  return (
+    <div>
+      <SectionHeading>Athletics</SectionHeading>
+
+      {/* Group 1: Physical stats */}
+      <form onSubmit={handleSavePhysical}>
+        <SettingRow label="Preferred units">
+          <select
+            value={preferredUnits}
+            onChange={(e) => handleUnitsChange(e.target.value as "metric" | "imperial")}
+            className={selectClass}
+          >
+            <option value="metric">Metric (km, kg)</option>
+            <option value="imperial">Imperial (mi, lbs)</option>
+          </select>
+        </SettingRow>
+        <SettingRow label={`Weight (${weightLabel})`}>
+          <Input
+            type="number"
+            value={weightDisplay}
+            onChange={(e) => setWeightDisplay(e.target.value)}
+            placeholder={preferredUnits === "imperial" ? "e.g. 160" : "e.g. 72"}
+            className="w-56"
+            min={0}
+            step="0.1"
+          />
+        </SettingRow>
+        <SettingRow label={`Height (${heightLabel})`}>
+          <Input
+            type="number"
+            value={heightDisplay}
+            onChange={(e) => setHeightDisplay(e.target.value)}
+            placeholder={preferredUnits === "imperial" ? "e.g. 70" : "e.g. 178"}
+            className="w-56"
+            min={0}
+            step="0.1"
+          />
+        </SettingRow>
+        <SettingRow label="Date of birth">
+          <Input
+            type="date"
+            value={dateOfBirth}
+            onChange={(e) => setDateOfBirth(e.target.value)}
+            className="w-56"
+          />
+        </SettingRow>
+        <div className="py-3 border-b border-zinc-100 dark:border-zinc-800/80">
+          <Button type="submit" size="sm" disabled={physLoading}>{physLoading ? "Saving…" : "Save"}</Button>
+        </div>
+      </form>
+
+      {/* Group 2: Training profile */}
+      <form onSubmit={handleSaveTraining} className="mt-2">
+        <SettingRow label="Primary sport">
+          <select
+            value={primarySport}
+            onChange={(e) => setPrimarySport(e.target.value)}
+            className={selectClass}
+          >
+            <option value="">Select…</option>
+            <option value="running">Running</option>
+            <option value="cycling">Cycling</option>
+            <option value="triathlon">Triathlon</option>
+            <option value="other">Other</option>
+          </select>
+        </SettingRow>
+        <SettingRow label="Experience level">
+          <select
+            value={experienceLevel}
+            onChange={(e) => setExperienceLevel(e.target.value)}
+            className={selectClass}
+          >
+            <option value="">Select…</option>
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
+          </select>
+        </SettingRow>
+        <SettingRow label="Max heart rate" description="Leave blank to use the 220 − age estimate.">
+          <Input
+            type="number"
+            value={maxHR}
+            onChange={(e) => setMaxHR(e.target.value)}
+            placeholder="auto"
+            className="w-56"
+            min={0}
+            max={299}
+          />
+        </SettingRow>
+        <SettingRow label="Training goal">
+          <select
+            value={goalType}
+            onChange={(e) => setGoalType(e.target.value)}
+            className={selectClass}
+          >
+            <option value="">Select…</option>
+            <option value="race_prep">Race preparation</option>
+            <option value="fitness">General fitness</option>
+            <option value="performance">Performance</option>
+            <option value="other">Other</option>
+          </select>
+        </SettingRow>
+        {goalType === "race_prep" && (
+          <>
+            <SettingRow label="Event name">
+              <Input
+                value={goalEventName}
+                onChange={(e) => setGoalEventName(e.target.value)}
+                placeholder="e.g. Boston Marathon"
+                className="w-56"
+              />
+            </SettingRow>
+            <SettingRow label="Distance" description="Free text, e.g. 42.2km or Half Ironman.">
+              <Input
+                value={goalEventDistance}
+                onChange={(e) => setGoalEventDistance(e.target.value)}
+                placeholder="e.g. 42.2km"
+                className="w-56"
+              />
+            </SettingRow>
+            <SettingRow label="Race date">
+              <Input
+                type="date"
+                value={goalEventDate}
+                onChange={(e) => setGoalEventDate(e.target.value)}
+                className="w-56"
+              />
+            </SettingRow>
+          </>
+        )}
+        <div className="py-3 border-b border-zinc-100 dark:border-zinc-800/80">
+          <Button type="submit" size="sm" disabled={trainingLoading}>{trainingLoading ? "Saving…" : "Save"}</Button>
+        </div>
+      </form>
+
+      {/* Group 3: Current injuries */}
+      <form onSubmit={async (e) => {
+        e.preventDefault();
+        setTrainingLoading(true);
+        try {
+          await saveProfile({ current_injuries: (e.currentTarget.querySelector("textarea") as HTMLTextAreaElement).value || null });
+          toast.success("Saved.");
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Failed to save");
+        }
+        setTrainingLoading(false);
+      }} className="mt-2">
+        <SettingRow
+          label="Current injuries / limitations"
+          description="The AI will reference this when reviewing your training load or flagging risky patterns."
+          fullWidth
+        >
+          <textarea
+            defaultValue={profile?.current_injuries ?? ""}
+            placeholder="Optional. e.g. 'Mild left knee tendinopathy — avoiding high mileage spikes'"
+            rows={3}
+            maxLength={500}
+            className="w-full rounded-md border border-zinc-200 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 resize-none"
+          />
+          <div className="mt-2">
+            <Button type="submit" size="sm">Save</Button>
+          </div>
+        </SettingRow>
+      </form>
+
+      {/* Group 4: Additional notes */}
       <form onSubmit={handleSaveContext} className="mt-2">
         <SettingRow
-          label="About your training"
-          description="Tell the agent about your situation — or leave blank if you prefer."
+          label="Additional notes"
+          description="Anything else the AI should know — context not captured by the fields above."
           fullWidth
         >
           <textarea
             value={trainingContext}
             onChange={(e) => setTrainingContext(e.target.value.slice(0, 1000))}
-            placeholder="Optional. e.g. 'Training for a half marathon in September, building base at 50km/week' or 'No specific goal — just staying fit and tracking progress.'"
+            placeholder="Optional. e.g. 'I train mostly in the evenings and prefer effort-based descriptions over pace zones.'"
             rows={4}
             className="w-full rounded-md border border-zinc-200 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 resize-none"
           />
@@ -555,11 +884,12 @@ function AccountSection({ onLogout, onClose }: { onLogout: () => void; onClose: 
 
 // ---- Modal shell ----
 
-type Section = "general" | "profile" | "data" | "account";
+type Section = "general" | "profile" | "athletics" | "data" | "account";
 
 const NAV: { id: Section; label: string }[] = [
   { id: "general", label: "General" },
   { id: "profile", label: "Profile" },
+  { id: "athletics", label: "Athletics" },
   { id: "data", label: "Data" },
   { id: "account", label: "Account" },
 ];
@@ -572,13 +902,15 @@ interface AccountModalProps {
   defaultTab?: "sync" | "settings";
 }
 
-const VALID_SECTIONS: Section[] = ["general", "profile", "data", "account"];
+const VALID_SECTIONS: Section[] = ["general", "profile", "athletics", "data", "account"];
 
 export function AccountModal({ open, onClose, userEmail, onLogout, defaultTab = "sync" }: AccountModalProps) {
   const [section, setSection] = useState<Section>(defaultTab === "sync" ? "data" : "general");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [trainingContext, setTrainingContext] = useState("");
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -587,6 +919,7 @@ export function AccountModal({ open, onClose, userEmail, onLogout, defaultTab = 
 
   useEffect(() => {
     if (!open) return;
+    setProfileLoaded(false);
     // Restore last visited section (except when opened via sync card — that has intent)
     if (defaultTab === "sync") {
       setSection("data");
@@ -594,12 +927,17 @@ export function AccountModal({ open, onClose, userEmail, onLogout, defaultTab = 
       const stored = localStorage.getItem("settings-section") as Section | null;
       setSection(stored && VALID_SECTIONS.includes(stored) ? stored : "general");
     }
-    // Fetch user metadata once per open so Profile fields are always pre-populated
-    supabase.auth.getUser().then(({ data }) => {
+    // Fetch user metadata and athlete profile in parallel
+    Promise.all([
+      supabase.auth.getUser(),
+      fetch("/api/profile").then((r) => r.json()),
+    ]).then(([{ data }, profileRes]) => {
       const meta = data.user?.user_metadata;
       setFirstName(meta?.first_name ?? "");
       setLastName(meta?.last_name ?? "");
       setTrainingContext(meta?.training_context ?? "");
+      setProfile((profileRes as { profile: UserProfile | null }).profile ?? null);
+      setProfileLoaded(true);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultTab]);
@@ -660,8 +998,29 @@ export function AccountModal({ open, onClose, userEmail, onLogout, defaultTab = 
                   userEmail={userEmail}
                   firstName={firstName} setFirstName={setFirstName}
                   lastName={lastName} setLastName={setLastName}
-                  trainingContext={trainingContext} setTrainingContext={setTrainingContext}
                 />
+              )}
+              {section === "athletics" && (
+                profileLoaded ? (
+                  <AthleticsSection
+                    profile={profile}
+                    trainingContext={trainingContext}
+                    setTrainingContext={setTrainingContext}
+                    onProfileSaved={setProfile}
+                  />
+                ) : (
+                  <div>
+                    <div className="h-7 w-24 rounded bg-zinc-100 dark:bg-zinc-800 mb-6 animate-pulse" />
+                    <div className="space-y-5 animate-pulse">
+                      {[...Array(5)].map((_, i) => (
+                        <div key={i} className="flex items-center justify-between py-4 border-b border-zinc-100 dark:border-zinc-800/80">
+                          <div className="h-3.5 w-28 rounded bg-zinc-100 dark:bg-zinc-800" />
+                          <div className="h-9 w-56 rounded-md bg-zinc-100 dark:bg-zinc-800" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
               )}
               {section === "data" && <DataSection />}
               {section === "account" && <AccountSection onLogout={onLogout} onClose={onClose} />}

@@ -66,3 +66,105 @@ Direct and analytical. No motivational-poster energy. If the data shows a concer
 Your final response should be clear, structured prose. For multi-metric analyses, use short paragraphs or bullet points. Always include specific numbers. End with any relevant caveats about data completeness.
 
 Never finish on a tool call. After all data is gathered and any charts are rendered, write a complete text answer that stands on its own — even when a chart is present.`;
+
+// ---- Athlete profile types ----
+
+export interface UserProfile {
+  user_id?: string;
+  date_of_birth?: string | null;
+  weight_kg?: number | null;
+  height_cm?: number | null;
+  preferred_units?: "metric" | "imperial";
+  primary_sport?: "running" | "cycling" | "triathlon" | "other" | null;
+  experience_level?: "beginner" | "intermediate" | "advanced" | null;
+  max_heart_rate?: number | null;
+  goal_type?: "race_prep" | "fitness" | "performance" | "other" | null;
+  goal_event_name?: string | null;
+  goal_event_distance?: string | null;
+  goal_event_date?: string | null;
+  current_injuries?: string | null;
+  updated_at?: string;
+}
+
+export function buildAthleteContext(
+  user: { user_metadata?: Record<string, unknown> },
+  profile: UserProfile | null
+): string {
+  const lines: string[] = [];
+
+  const firstName = user.user_metadata?.first_name as string | undefined;
+  if (firstName) lines.push(`The user's first name is ${firstName}.`);
+
+  if (profile) {
+    // Injuries go first — most important for safe advice
+    if (profile.current_injuries?.trim()) {
+      lines.push(`IMPORTANT — Current injuries/limitations: ${profile.current_injuries.trim()}`);
+    }
+
+    const parts: string[] = [];
+
+    if (profile.date_of_birth) {
+      const ageMs = Date.now() - new Date(profile.date_of_birth).getTime();
+      const age = Math.floor(ageMs / (365.25 * 24 * 3600 * 1000));
+      parts.push(`Age: ${age}`);
+      const estimatedHRmax = 220 - age;
+      if (!profile.max_heart_rate) {
+        parts.push(`Estimated HRmax: ${estimatedHRmax} bpm (220 − age)`);
+      }
+    }
+
+    if (profile.max_heart_rate) {
+      parts.push(`Max heart rate: ${profile.max_heart_rate} bpm (user-confirmed)`);
+    }
+
+    if (profile.weight_kg) {
+      parts.push(`Weight: ${profile.weight_kg} kg`);
+    }
+
+    if (profile.height_cm) {
+      const bmi =
+        profile.weight_kg
+          ? Math.round((profile.weight_kg / Math.pow(profile.height_cm / 100, 2)) * 10) / 10
+          : null;
+      parts.push(`Height: ${profile.height_cm} cm${bmi ? ` (BMI: ${bmi})` : ""}`);
+    }
+
+    if (profile.preferred_units) {
+      parts.push(`Preferred units: ${profile.preferred_units}`);
+    }
+
+    if (profile.primary_sport) {
+      parts.push(`Primary sport: ${profile.primary_sport}`);
+    }
+
+    if (profile.experience_level) {
+      parts.push(`Experience level: ${profile.experience_level}`);
+    }
+
+    if (profile.goal_type) {
+      let goalStr = `Training goal: ${profile.goal_type.replace("_", " ")}`;
+      if (profile.goal_type === "race_prep" && profile.goal_event_name) {
+        goalStr += ` — ${profile.goal_event_name}`;
+        if (profile.goal_event_distance) goalStr += ` (${profile.goal_event_distance})`;
+        if (profile.goal_event_date) {
+          const weeksOut = Math.ceil(
+            (new Date(profile.goal_event_date).getTime() - Date.now()) / (7 * 24 * 3600 * 1000)
+          );
+          goalStr += weeksOut > 0 ? `, ${weeksOut} weeks away` : ` (race date passed)`;
+        }
+      }
+      parts.push(goalStr);
+    }
+
+    if (parts.length > 0) {
+      lines.push(`Athlete profile: ${parts.join(". ")}.`);
+    }
+  }
+
+  const trainingContext = user.user_metadata?.training_context as string | undefined;
+  if (trainingContext?.trim()) {
+    lines.push(`Additional training notes: ${trainingContext.trim()}`);
+  }
+
+  return lines.length > 0 ? lines.join("\n") + "\n\n" : "";
+}
