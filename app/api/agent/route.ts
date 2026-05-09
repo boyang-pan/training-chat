@@ -1,7 +1,8 @@
 import { anthropic } from "@ai-sdk/anthropic";
 import { stepCountIs, generateText } from "ai";
 import { createAgentTools } from "@/lib/agent/tools";
-import { SYSTEM_PROMPT } from "@/lib/agent/system-prompt";
+import { SYSTEM_PROMPT, buildAthleteContext } from "@/lib/agent/system-prompt";
+import type { UserProfile } from "@/lib/agent/system-prompt";
 import { supabaseAdmin } from "@/lib/supabase/client";
 import { getAuthUser } from "@/lib/supabase/server";
 import { logger, streamText } from "@/lib/braintrust";
@@ -18,9 +19,13 @@ export async function POST(request: Request) {
     const { question, history, conversation_id, timezone } = await request.json();
 
     const userId = user.id;
-    const firstName = user.user_metadata?.first_name as string | undefined;
-    const trainingContext = user.user_metadata?.training_context as string | undefined;
     const agentTools = createAgentTools(userId);
+
+    const { data: athleteProfile } = await supabaseAdmin
+      .from("user_profiles")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
 
     const now = new Date();
     const weekStart = (() => {
@@ -32,7 +37,7 @@ export async function POST(request: Request) {
     const dateContext = `Today's date context: today=${now.toISOString().split("T")[0]}, day_of_week=${now.toLocaleDateString("en-US", { weekday: "long" })}, iso_week_start=${weekStart}, month_start=${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01.`;
 
     const timezoneContext = timezone ? `User's local timezone: ${timezone}. Always convert start_date (stored as UTC) to this timezone when displaying activity times.` : "";
-    const systemPrompt = `${SYSTEM_PROMPT}\n\n${dateContext}\n\n${timezoneContext ? timezoneContext + "\n\n" : ""}${firstName ? `The user's first name is ${firstName}. ` : ""}${trainingContext ? `About this user's training (goals, constraints, focus): ${trainingContext}\n\n` : ""}Current user ID: ${userId}. Always include WHERE user_id = '${userId}' in every SQL query.`;
+    const systemPrompt = `${SYSTEM_PROMPT}\n\n${dateContext}\n\n${timezoneContext ? timezoneContext + "\n\n" : ""}${buildAthleteContext(user, athleteProfile as UserProfile | null)}Current user ID: ${userId}. Always include WHERE user_id = '${userId}' in every SQL query.`;
 
     const span = logger.startSpan({ name: "agent-turn" });
 
