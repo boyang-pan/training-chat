@@ -14,7 +14,7 @@ export interface ReasoningState {
   toolCall?: ToolCall;
 }
 
-export type ChartType = "line" | "bar" | "scatter";
+export type ChartType = "line" | "bar" | "scatter" | "area" | "pie";
 
 export interface ChartDataPoint {
   [key: string]: string | number;
@@ -27,6 +27,7 @@ export interface ChartPayload {
   data: ChartDataPoint[];
   x_key: string;
   y_key: string;
+  y_keys?: string[];
   x_label?: string;
   y_label?: string;
 }

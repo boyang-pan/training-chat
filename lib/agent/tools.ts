@@ -228,16 +228,20 @@ export function createAgentTools(userId: string) {
 
     render_chart: tool({
       description:
-        "Returns a chart payload for the frontend to render inline. Use when trends or comparisons are better expressed visually. Supported types: line, bar, scatter. Always follow render_chart with a written analysis — never let a chart be your final action.",
+        "Returns a chart payload for the frontend to render inline. Use when trends or comparisons are better expressed visually. Chart type guide: line=single metric trend over time; area=cumulative buildup or ramp (CTL, mileage); bar=weekly/monthly aggregates; scatter=correlation between two metrics; pie=distribution/proportion breakdown. Use y_keys (array) instead of y_key when comparing 2–3 related metrics on the same time axis (e.g. CTL+ATL+TSB). Always follow render_chart with a written analysis — never let a chart be your final action.",
       inputSchema: z.object({
-        type: z.enum(["line", "bar", "scatter"]).describe("Chart type"),
+        type: z.enum(["line", "bar", "scatter", "area", "pie"]).describe("Chart type"),
         title: z.string().describe("Chart title"),
         subtitle: z.string().optional().describe("Optional subtitle"),
         data: z
           .array(z.record(z.string(), z.union([z.string(), z.number()])))
           .describe("Array of data point objects"),
         x_key: z.string().describe("Key in data objects to use for x-axis"),
-        y_key: z.string().describe("Key in data objects to use for y-axis"),
+        y_key: z.string().describe("Key in data objects to use for y-axis (single series)"),
+        y_keys: z
+          .array(z.string())
+          .optional()
+          .describe("Keys for multiple series (overrides y_key); max 3 series"),
         x_label: z.string().optional().describe("X-axis label"),
         y_label: z.string().optional().describe("Y-axis label"),
       }),
