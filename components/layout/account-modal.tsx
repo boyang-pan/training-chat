@@ -23,6 +23,8 @@ interface UserProfile {
   primary_sport?: "running" | "cycling" | "triathlon" | "other" | null;
   experience_level?: "beginner" | "intermediate" | "advanced" | null;
   max_heart_rate?: number | null;
+  ftp_watts?: number | null;
+  run_threshold_pace_sec?: number | null;
   goal_type?: "race_prep" | "fitness" | "performance" | "other" | null;
   goal_event_name?: string | null;
   goal_event_distance?: string | null;
@@ -313,6 +315,19 @@ function ProfileSection({
 // ---- Native select shared styling ----
 const selectClass = "h-9 w-56 rounded-md border border-zinc-200 dark:border-zinc-700 bg-transparent px-3 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 appearance-none cursor-pointer";
 
+function secToMmss(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function mmssToSec(str: string): number | null {
+  const match = str.match(/^(\d+):([0-5]\d)$/);
+  if (!match) return null;
+  const sec = parseInt(match[1]) * 60 + parseInt(match[2]);
+  return sec > 60 && sec < 1200 ? sec : null;
+}
+
 function AthleticsSection({
   profile,
   trainingContext, setTrainingContext,
@@ -348,6 +363,13 @@ function AthleticsSection({
   const [goalEventDate, setGoalEventDate] = useState(profile?.goal_event_date ?? "");
   const [trainingLoading, setTrainingLoading] = useState(false);
 
+  // Training thresholds
+  const [thresholdPaceDisplay, setThresholdPaceDisplay] = useState(
+    profile?.run_threshold_pace_sec ? secToMmss(profile.run_threshold_pace_sec) : ""
+  );
+  const [ftpWatts, setFtpWatts] = useState(profile?.ftp_watts ? String(profile.ftp_watts) : "");
+  const [thresholdsLoading, setThresholdsLoading] = useState(false);
+
   // Notes
   const [contextLoading, setContextLoading] = useState(false);
 
@@ -365,6 +387,8 @@ function AthleticsSection({
     setGoalEventName(profile.goal_event_name ?? "");
     setGoalEventDistance(profile.goal_event_distance ?? "");
     setGoalEventDate(profile.goal_event_date ?? "");
+    setThresholdPaceDisplay(profile.run_threshold_pace_sec ? secToMmss(profile.run_threshold_pace_sec) : "");
+    setFtpWatts(profile.ftp_watts ? String(profile.ftp_watts) : "");
   }, [profile]);
 
   // Convert displayed weight/height when units toggle
@@ -453,6 +477,28 @@ function AthleticsSection({
       toast.error(err instanceof Error ? err.message : "Failed to save");
     }
     setTrainingLoading(false);
+  }
+
+  async function handleSaveThresholds(e: React.FormEvent) {
+    e.preventDefault();
+    setThresholdsLoading(true);
+    try {
+      const paceSec = thresholdPaceDisplay ? mmssToSec(thresholdPaceDisplay) : null;
+      if (thresholdPaceDisplay && paceSec === null) {
+        toast.error("Threshold pace must be in m:ss format (e.g. 5:00).");
+        setThresholdsLoading(false);
+        return;
+      }
+      const ftp = ftpWatts ? parseInt(ftpWatts, 10) : null;
+      await saveProfile({
+        run_threshold_pace_sec: paceSec,
+        ftp_watts: ftp,
+      });
+      toast.success("Training thresholds saved.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    }
+    setThresholdsLoading(false);
   }
 
   async function handleSaveContext(e: React.FormEvent) {
@@ -599,6 +645,40 @@ function AthleticsSection({
         )}
         <div className="py-3 border-b border-zinc-100 dark:border-zinc-800/80">
           <Button type="submit" size="sm" disabled={trainingLoading}>{trainingLoading ? "Saving…" : "Save"}</Button>
+        </div>
+      </form>
+
+      {/* Group 2.5: Training thresholds */}
+      <form onSubmit={handleSaveThresholds} className="mt-2">
+        <SettingRow
+          label="Run threshold pace"
+          description="The pace you can sustain for ~60 min. Auto-estimated from your race history if left blank."
+        >
+          <Input
+            value={thresholdPaceDisplay}
+            onChange={(e) => setThresholdPaceDisplay(e.target.value)}
+            placeholder="e.g. 5:00"
+            className="w-56 font-mono"
+          />
+        </SettingRow>
+        <SettingRow
+          label="Cycling FTP (watts)"
+          description="Your Functional Threshold Power. Used to compute cycling power zones."
+        >
+          <Input
+            type="number"
+            value={ftpWatts}
+            onChange={(e) => setFtpWatts(e.target.value)}
+            placeholder="e.g. 250"
+            className="w-56"
+            min={0}
+            max={600}
+          />
+        </SettingRow>
+        <div className="py-3 border-b border-zinc-100 dark:border-zinc-800/80">
+          <Button type="submit" size="sm" disabled={thresholdsLoading}>
+            {thresholdsLoading ? "Saving…" : "Save"}
+          </Button>
         </div>
       </form>
 

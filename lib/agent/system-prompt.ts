@@ -53,6 +53,27 @@ For runners, aerobic efficiency = average speed / average heart rate on easy aer
 ## Tone
 Direct and analytical. No motivational-poster energy. If the data shows a concerning pattern, say so clearly. If training is going well, acknowledge it without hyperbole.
 
+## Workout prescription
+When asked to suggest or prescribe a workout, always use the training zones injected in the athlete context. Never guess at pace or power — if zone data is missing, tell the user what to set in Settings → Athletics → Training Thresholds.
+
+Prescription format:
+- Running: "6×1 km at T-pace (4:51–5:09/km), 90 s recovery jog"
+- Cycling: "3×10 min at Z4 threshold (226–262 W), 5 min easy between"
+- HR only: "Zone 3 effort (131–151 bpm), conversational pace"
+
+Zone selection by session purpose:
+- Recovery: Z1–Z2 / E pace
+- Aerobic base / long run: Z2 / M pace
+- Tempo / cruise intervals: T pace / Z3–Z4
+- VO2max intervals (3–8 min repeats): I pace / Z5
+- Speed/economy (short, full recovery): R pace / Z6–Z7
+- Race-specific: match zone to target race pace
+
+Also factor in form from get_training_load() before prescribing:
+- TSB < −20 → avoid Z4+ sessions; recommend Z1–Z2 recovery
+- ACWR > 1.3 → flag injury risk and scale back intensity
+- TSB > +5 and ACWR < 1.2 → cleared for quality sessions
+
 ## Tool usage
 - Always call get_schema() first to orient yourself to the current database structure.
 - Today's date context (today, day of week, ISO week start, month start) is pre-injected in the system prompt — use it directly for time-based queries, do not call any date tool.
@@ -78,12 +99,86 @@ export interface UserProfile {
   primary_sport?: "running" | "cycling" | "triathlon" | "other" | null;
   experience_level?: "beginner" | "intermediate" | "advanced" | null;
   max_heart_rate?: number | null;
+  ftp_watts?: number | null;
+  run_threshold_pace_sec?: number | null;
   goal_type?: "race_prep" | "fitness" | "performance" | "other" | null;
   goal_event_name?: string | null;
   goal_event_distance?: string | null;
   goal_event_date?: string | null;
   current_injuries?: string | null;
   updated_at?: string;
+}
+
+function secToMmss(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function buildZoneContext(profile: UserProfile | null): string {
+  if (!profile) return "";
+
+  const sections: string[] = [];
+
+  // Running pace zones
+  const tSec = profile.run_threshold_pace_sec;
+  if (tSec && tSec > 0) {
+    const T = tSec;
+    const ePaceMin = Math.round(T * 1.29);
+    const ePaceMax = Math.round(T * 1.40);
+    const mPaceMin = Math.round(T * 1.05);
+    const mPaceMax = Math.round(T * 1.15);
+    const tPaceMin = Math.round(T * 0.97);
+    const tPaceMax = Math.round(T * 1.03);
+    const iPaceMin = Math.round(T * 0.87);
+    const iPaceMax = Math.round(T * 0.95);
+    const rPaceMin = Math.round(T * 0.75);
+    const rPaceMax = Math.round(T * 0.85);
+
+    sections.push(
+      `Running — threshold: ${secToMmss(T)}/km\n` +
+      `  Named paces:\n` +
+      `    E  Easy:      ${secToMmss(ePaceMin)}–${secToMmss(ePaceMax)}/km  (recovery, base, long runs)\n` +
+      `    M  Marathon:  ${secToMmss(mPaceMin)}–${secToMmss(mPaceMax)}/km  (sustained aerobic)\n` +
+      `    T  Threshold: ${secToMmss(tPaceMin)}–${secToMmss(tPaceMax)}/km  (cruise intervals, tempo)\n` +
+      `    I  Interval:  ${secToMmss(iPaceMin)}–${secToMmss(iPaceMax)}/km  (VO2max efforts, 3–5 min)\n` +
+      `    R  Reps:      ${secToMmss(rPaceMin)}–${secToMmss(rPaceMax)}/km  (speed/economy, <2 min)\n` +
+      `  Zones: Z1 >${secToMmss(Math.round(T * 1.40))} · Z2 ${secToMmss(Math.round(T * 1.14))}–${secToMmss(Math.round(T * 1.40))} · Z3 ${secToMmss(Math.round(T * 1.03))}–${secToMmss(Math.round(T * 1.14))} · Z4 ${secToMmss(Math.round(T * 0.95))}–${secToMmss(Math.round(T * 1.03))} · Z5 <${secToMmss(Math.round(T * 0.95))}`
+    );
+  }
+
+  // Cycling power zones (Coggan 7-zone)
+  const ftp = profile.ftp_watts;
+  if (ftp && ftp > 0) {
+    const z = (pct: number) => Math.round(ftp * pct);
+    sections.push(
+      `Cycling — FTP: ${ftp} W\n` +
+      `  Z1 Recovery:      ≤${z(0.55)} W\n` +
+      `  Z2 Endurance:     ${z(0.56)}–${z(0.75)} W\n` +
+      `  Z3 Tempo:         ${z(0.76)}–${z(0.90)} W\n` +
+      `  Z4 Threshold:     ${z(0.91)}–${z(1.05)} W\n` +
+      `  Z5 VO2max:        ${z(1.06)}–${z(1.20)} W\n` +
+      `  Z6 Anaerobic:     ${z(1.21)}–${z(1.50)} W\n` +
+      `  Z7 Neuromuscular: >${z(1.50)} W`
+    );
+  }
+
+  // HR zones (5-zone % HRmax) — always shown when HRmax known
+  const hrMax = profile.max_heart_rate;
+  if (hrMax && hrMax > 0) {
+    const hr = (pct: number) => Math.round(hrMax * pct);
+    sections.push(
+      `Heart rate — max: ${hrMax} bpm\n` +
+      `  Z1 Recovery:  <${hr(0.60)} bpm\n` +
+      `  Z2 Aerobic:   ${hr(0.60)}–${hr(0.72)} bpm\n` +
+      `  Z3 Tempo:     ${hr(0.72)}–${hr(0.83)} bpm\n` +
+      `  Z4 Threshold: ${hr(0.83)}–${hr(0.92)} bpm\n` +
+      `  Z5 Max:       >${hr(0.92)} bpm`
+    );
+  }
+
+  if (sections.length === 0) return "";
+  return "Training zones (use these targets when prescribing workouts):\n\n" + sections.join("\n\n");
 }
 
 export function buildAthleteContext(
@@ -166,5 +261,8 @@ export function buildAthleteContext(
     lines.push(`Additional training notes: ${trainingContext.trim()}`);
   }
 
-  return lines.length > 0 ? lines.join("\n") + "\n\n" : "";
+  const zoneContext = buildZoneContext(profile);
+  if (zoneContext) lines.push(zoneContext);
+
+  return lines.length > 0 ? lines.join("\n\n") + "\n\n" : "";
 }

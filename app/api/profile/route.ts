@@ -47,6 +47,37 @@ async function inferFromStrava(userId: string): Promise<Partial<UserProfile>> {
     inferred.max_heart_rate = hrData.max_heartrate as number;
   }
 
+  // Run threshold pace: estimate from best recent race results using distance-based conversion factors
+  const since18mo = new Date(Date.now() - 18 * 30 * 24 * 3600 * 1000).toISOString();
+  const { data: races } = await supabaseAdmin
+    .from("activities")
+    .select("distance_meters, moving_time_seconds")
+    .eq("user_id", userId)
+    .eq("type", "Run")
+    .eq("workout_type", 1)
+    .gte("start_date", since18mo)
+    .gt("distance_meters", 1000)
+    .gt("moving_time_seconds", 0);
+
+  if (races && races.length > 0) {
+    const estimates: number[] = [];
+    for (const r of races) {
+      const distKm = (r.distance_meters as number) / 1000;
+      const paceSec = (r.moving_time_seconds as number) / distKm;
+      // Conversion factors: threshold pace is slightly slower than race pace at shorter distances
+      let factor: number | null = null;
+      if (distKm >= 4.5 && distKm <= 5.5) factor = 1.065;       // 5K
+      else if (distKm >= 9.0 && distKm <= 11.0) factor = 1.030; // 10K
+      else if (distKm >= 20.0 && distKm <= 22.5) factor = 1.010; // half marathon
+      else if (distKm >= 40.0 && distKm <= 45.0) factor = 0.930; // marathon
+      if (factor !== null) estimates.push(Math.round(paceSec * factor));
+    }
+    if (estimates.length > 0) {
+      estimates.sort((a, b) => a - b);
+      inferred.run_threshold_pace_sec = estimates[Math.floor(estimates.length / 2)];
+    }
+  }
+
   return inferred;
 }
 
@@ -61,7 +92,7 @@ export async function GET() {
     .maybeSingle();
 
   // Bootstrap: if row doesn't exist or inferred fields are missing, populate from Strava
-  const needsInference = !profile || (!profile.primary_sport && !profile.max_heart_rate);
+  const needsInference = !profile || (!profile.primary_sport && !profile.max_heart_rate) || !profile.run_threshold_pace_sec;
   if (needsInference) {
     const inferred = await inferFromStrava(user.id);
     if (Object.keys(inferred).length > 0) {
@@ -124,6 +155,14 @@ export async function PATCH(request: Request) {
   if (body.goal_event_date !== undefined) patch.goal_event_date = body.goal_event_date || null;
   if (body.current_injuries !== undefined) {
     patch.current_injuries = body.current_injuries ? body.current_injuries.slice(0, 500) : null;
+  }
+  if (body.ftp_watts !== undefined) {
+    const ftp = Number(body.ftp_watts);
+    patch.ftp_watts = body.ftp_watts === null ? null : (!isNaN(ftp) && ftp > 0 && ftp <= 600 ? Math.round(ftp) : undefined);
+  }
+  if (body.run_threshold_pace_sec !== undefined) {
+    const pace = Number(body.run_threshold_pace_sec);
+    patch.run_threshold_pace_sec = body.run_threshold_pace_sec === null ? null : (!isNaN(pace) && pace > 60 && pace < 1200 ? Math.round(pace) : undefined);
   }
 
   const { data, error } = await supabaseAdmin
