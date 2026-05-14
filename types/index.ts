@@ -47,6 +47,22 @@ export interface WorkoutPayload {
   description?: string;
 }
 
+export interface SegmentEffort {
+  date: string;
+  time_sec: number;
+  is_best: boolean;
+  pr_rank?: number;
+}
+
+export interface SegmentPayload {
+  name: string;
+  distance_m: number;
+  efforts: SegmentEffort[];
+  best_time_sec: number;
+  best_date: string;
+  effort_count: number;
+}
+
 export interface AgentPlan {
   steps: string[];
 }
@@ -55,7 +71,8 @@ export interface AgentMessage {
   plan?: AgentPlan;
   states: ReasoningState[];
   chart?: ChartPayload;
-  workout?: WorkoutPayload;
+  workouts?: WorkoutPayload[];
+  segment?: SegmentPayload;
   reasoning?: string;
   final_answer: string;
   duration_ms?: number;

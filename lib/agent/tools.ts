@@ -2,7 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/client";
 import { computeTrainingLoad, type TrainingLoadResult } from "@/lib/agent/training-load";
-import type { ChartPayload, WorkoutPayload } from "@/types";
+import type { ChartPayload, WorkoutPayload, SegmentEffort, SegmentPayload } from "@/types";
 
 const trainingLoadCache = new Map<string, { result: TrainingLoadResult; ts: number }>();
 const TRAINING_LOAD_CACHE_TTL = 5 * 60 * 1000;
@@ -13,96 +13,6 @@ const TRAINING_LOAD_CACHE_TTL = 5 * 60 * 1000;
  */
 export function createAgentTools(userId: string) {
   return {
-    get_schema: tool({
-      description:
-        "Returns the database schema including all tables and column definitions. Always call this first to orient yourself.",
-      inputSchema: z.object({}),
-      execute: async () => {
-        return {
-          tables: {
-            activities: {
-              description: "Training activities from connected data sources (scoped to current user)",
-              columns: {
-                id: "bigint — Strava activity ID",
-                user_id: "uuid — owner (always filter by this)",
-                name: "text — Activity name",
-                type: "text — Run, Ride, Swim, etc.",
-                workout_type:
-                  "int nullable — 0=default run, 1=race, 2=long run, 3=workout; 10=default ride, 11=race ride, 12=workout ride",
-                start_date: "timestamptz",
-                distance_meters: "float",
-                moving_time_seconds: "int",
-                elapsed_time_seconds: "int",
-                elevation_gain_meters: "float",
-                average_heartrate: "float nullable",
-                max_heartrate: "float nullable",
-                average_speed_mps: "float — convert to min/km: 1000/(speed*60)",
-                max_speed_mps: "float",
-                suffer_score: "int nullable",
-                perceived_exertion: "int nullable — 1-10",
-                average_watts: "float nullable",
-                weighted_average_watts: "int nullable — normalised power",
-                max_watts: "int nullable",
-                kilojoules: "float nullable",
-                device_watts: "boolean nullable — true=power meter",
-                calories: "float nullable — DetailedActivity only",
-                gear_id: "text nullable",
-                description: "text nullable — DetailedActivity only",
-                sync_status: "text — summary or detailed",
-                synced_at: "timestamptz",
-              },
-            },
-            activity_notes: {
-              description: "User-provided subjective context, persists across sessions",
-              columns: {
-                id: "uuid",
-                user_id: "uuid — owner",
-                activity_id: "bigint nullable — FK to activities",
-                note_date: "date nullable",
-                content: "text",
-                created_at: "timestamptz",
-              },
-            },
-            personal_records: {
-              description: "Pre-computed personal records, updated on each sync",
-              columns: {
-                user_id: "uuid — owner",
-                metric: "text — e.g. fastest_run_pace, longest_ride",
-                activity_id: "bigint — FK to activities",
-                value: "float",
-                achieved_at: "timestamptz",
-                updated_at: "timestamptz",
-              },
-            },
-            segment_efforts: {
-              description:
-                "One row per segment effort per activity. Use segment_id to group all efforts on the same " +
-                "Strava segment across activities. Useful for: progression over time, PRs, most-ridden segments.",
-              columns: {
-                id: "bigint — Strava segment effort ID",
-                user_id: "uuid — always filter by this",
-                activity_id: "bigint — FK to activities.id",
-                segment_id: "bigint — Strava segment ID; group by this to see all efforts on one segment",
-                name: "text — segment name (consistent per segment_id, denormalised for display)",
-                elapsed_time: "int — seconds on segment (wall clock)",
-                moving_time: "int — seconds moving on segment",
-                start_date: "timestamptz — when this effort started",
-                distance: "float — meters",
-                average_watts: "float nullable",
-                average_heartrate: "float nullable",
-                max_heartrate: "float nullable",
-                average_cadence: "float nullable",
-                pr_rank: "int nullable — 1/2/3 if top-3 personal best at time of activity",
-                kom_rank: "int nullable — rank if top-10 KOM at time of activity",
-                achievements: "jsonb nullable — [{type_id, type, rank}]; use achievements @> '[{\"type\":\"pr\"}]' to filter PRs",
-              },
-            },
-          },
-        };
-      },
-    }),
-
-
     run_query: tool({
       description:
         "Executes a read-only SQL query against the activities database. Use for all data retrieval. SQL must be SELECT only — no mutations. Always include WHERE user_id = '" + userId + "' to scope results to the current user.",
@@ -266,6 +176,46 @@ export function createAgentTools(userId: string) {
         })),
       }),
       execute: async (params) => params as WorkoutPayload,
+    }),
+
+    render_segment_chart: tool({
+      description:
+        "Fetches all efforts for a specific Strava segment and returns a visualization payload. Use when the user asks about their history or progression on a named segment. First call run_query to find the segment_id (SELECT segment_id, name FROM segment_efforts WHERE user_id = '...' AND name ILIKE '%segment name%' LIMIT 1). Always follow render_segment_chart with written commentary on the trend.",
+      inputSchema: z.object({
+        segment_id: z.number().describe("Strava segment ID"),
+        segment_name: z.string().optional().describe("Segment name for display (pass the name from your run_query result)"),
+        distance_m: z.number().optional().describe("Segment distance in meters (pass if known from run_query)"),
+      }),
+      execute: async ({ segment_id, segment_name, distance_m }: { segment_id: number; segment_name?: string; distance_m?: number }) => {
+        const { data, error } = await supabaseAdmin
+          .from("segment_efforts")
+          .select("start_date, elapsed_time, pr_rank")
+          .eq("user_id", userId)
+          .eq("segment_id", segment_id)
+          .order("start_date", { ascending: true });
+
+        if (error) return { error: error.message };
+        if (!data?.length) return { error: "No efforts found for this segment." };
+
+        const bestTime = Math.min(...data.map((r) => r.elapsed_time));
+        const bestRow = data.find((r) => r.elapsed_time === bestTime)!;
+
+        const efforts: SegmentEffort[] = data.map((r) => ({
+          date: r.start_date.split("T")[0],
+          time_sec: r.elapsed_time,
+          is_best: r.elapsed_time === bestTime,
+          pr_rank: r.pr_rank ?? undefined,
+        }));
+
+        return {
+          name: segment_name ?? `Segment ${segment_id}`,
+          distance_m: distance_m ?? 0,
+          efforts,
+          best_time_sec: bestTime,
+          best_date: bestRow.start_date.split("T")[0],
+          effort_count: data.length,
+        } satisfies SegmentPayload;
+      },
     }),
 
     get_training_load: tool({

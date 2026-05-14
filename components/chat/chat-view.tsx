@@ -128,7 +128,15 @@ function parseStreamLine(
           output &&
           typeof output === "object"
         ) {
-          updated.workout = output as AgentMessage["workout"];
+          updated.workouts = [...(updated.workouts ?? []), output as NonNullable<AgentMessage["workouts"]>[number]];
+        }
+        if (
+          updated.states[idx].toolCall?.tool === "render_segment_chart" &&
+          output &&
+          typeof output === "object" &&
+          !("error" in (output as object))
+        ) {
+          updated.segment = output as AgentMessage["segment"];
         }
       }
     } catch {
@@ -163,7 +171,6 @@ function parseStreamLine(
 
 function labelForTool(toolName: string, input: Record<string, unknown>): string {
   const labels: Record<string, string> = {
-    get_schema: "Reading the database schema",
     run_query: "Running a query",
     get_activity_detail: "Getting activity detail",
     get_personal_records: "Fetching personal records",
@@ -171,6 +178,7 @@ function labelForTool(toolName: string, input: Record<string, unknown>): string 
     add_note: "Saving a note",
     render_chart: "Preparing chart",
     render_workout: "Preparing workout",
+    render_segment_chart: "Loading segment data",
     ask_user: "Asking a clarifying question",
   };
 
