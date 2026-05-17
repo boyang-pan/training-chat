@@ -1,8 +1,9 @@
 "use client";
 
 import {
-  ScatterChart,
+  ComposedChart,
   Scatter,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -11,6 +12,20 @@ import {
 } from "recharts";
 import { useTheme } from "next-themes";
 import type { SegmentPayload, SegmentEffort } from "@/types";
+
+function linearRegression(points: { x: number; y: number }[]) {
+  const n = points.length;
+  if (n < 2) return null;
+  const sumX = points.reduce((s, p) => s + p.x, 0);
+  const sumY = points.reduce((s, p) => s + p.y, 0);
+  const sumXY = points.reduce((s, p) => s + p.x * p.y, 0);
+  const sumX2 = points.reduce((s, p) => s + p.x * p.x, 0);
+  const denom = n * sumX2 - sumX * sumX;
+  if (denom === 0) return null;
+  const slope = (n * sumXY - sumX * sumY) / denom;
+  const intercept = (sumY - slope * sumX) / n;
+  return { slope, intercept };
+}
 
 function formatTime(sec: number): string {
   const h = Math.floor(sec / 3600);
@@ -91,6 +106,22 @@ export function SegmentBlock({ segment }: SegmentBlockProps) {
   // Reversed: lower time (faster) should appear higher on axis
   const yDomain: [number, number] = [maxTime + padding, Math.max(minTime - padding, 0)];
 
+  const regressionPoints = (() => {
+    const pts = segment.efforts.map((e) => ({
+      x: new Date(e.date).getTime(),
+      y: e.time_sec,
+    }));
+    const reg = linearRegression(pts);
+    if (!reg) return null;
+    const xs = pts.map((p) => p.x);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    return [
+      { timestamp: minX, trend: Math.round(reg.slope * minX + reg.intercept) },
+      { timestamp: maxX, trend: Math.round(reg.slope * maxX + reg.intercept) },
+    ];
+  })();
+
   const distLabel = formatDistance(segment.distance_m);
   const subtitle = [distLabel, `${segment.effort_count} effort${segment.effort_count !== 1 ? "s" : ""}`, `Best: ${formatTime(segment.best_time_sec)} on ${segment.best_date}`]
     .filter(Boolean)
@@ -102,7 +133,7 @@ export function SegmentBlock({ segment }: SegmentBlockProps) {
       <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 mb-3">{subtitle}</p>
 
       <ResponsiveContainer width="100%" height={200}>
-        <ScatterChart margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+        <ComposedChart margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
           <XAxis
             dataKey="timestamp"
@@ -134,7 +165,19 @@ export function SegmentBlock({ segment }: SegmentBlockProps) {
             fill={bestDot}
             r={5}
           />
-        </ScatterChart>
+          {regressionPoints && (
+            <Line
+              data={regressionPoints}
+              dataKey="trend"
+              dot={false}
+              activeDot={false}
+              stroke={normalDot}
+              strokeWidth={1}
+              strokeDasharray="4 3"
+              strokeOpacity={0.5}
+            />
+          )}
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );

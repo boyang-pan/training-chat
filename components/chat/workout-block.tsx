@@ -46,6 +46,13 @@ const ZONE_INTENSITY_MIDPOINT: Record<number, number> = {
   7: 150,
 };
 
+function formatDuration(min: number): string {
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m > 0 ? `${h}h ${m}min` : `${h}h`;
+}
+
 const SPORT_LABEL: Record<string, string> = {
   run: "Run",
   ride: "Ride",
@@ -133,8 +140,27 @@ export function WorkoutBlock({ workout }: WorkoutBlockProps) {
           <SegmentBar key={i} seg={seg} totalMin={total_duration_min} color={zoneColors[seg.zone]} />
         ))}
       </div>
+      {/* Zone legend — only zones used in this workout */}
+      {(() => {
+        const usedZones = [...new Set(segments.map((s) => s.zone))].sort((a, b) => a - b);
+        return (
+          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2.5">
+            {usedZones.map((z) => (
+              <div key={z} className="flex items-center gap-1">
+                <span
+                  className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                  style={{ backgroundColor: zoneColors[z] }}
+                />
+                <span className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                  {ZONE_LABELS[z]}
+                </span>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
       <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
-        {total_duration_min} min total
+        {formatDuration(total_duration_min)} total
       </p>
     </div>
   );
