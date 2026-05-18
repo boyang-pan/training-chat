@@ -342,6 +342,14 @@ export function ChatView({ conversationId }: ChatViewProps) {
     return () => document.removeEventListener("keydown", handleSlash);
   }, []);
 
+  // Sync browser tab title to conversation title
+  useEffect(() => {
+    document.title = conversationTitle
+      ? `${conversationTitle} — Training Chat`
+      : "Training Chat";
+    return () => { document.title = "Training Chat"; };
+  }, [conversationTitle]);
+
   // Auto-select input text when title editing starts
   useLayoutEffect(() => {
     if (isEditingTitle) titleInputRef.current?.select();
@@ -666,6 +674,18 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const handleStop = useCallback(() => {
     abortControllerRef.current?.abort();
   }, []);
+
+  // Escape stops generation
+  useEffect(() => {
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape" && isLoading) {
+        e.preventDefault();
+        handleStop();
+      }
+    }
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isLoading, handleStop]);
 
   const lastAgentMsgId =
     messages.filter((m) => m.role === "assistant").at(-1)?.id ?? null;
