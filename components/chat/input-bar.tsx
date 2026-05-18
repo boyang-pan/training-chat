@@ -48,7 +48,7 @@ export function InputBar({ onSubmit, disabled, onStop, textareaRef: externalRef 
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
       e.preventDefault();
       handleSubmit();
     }
