@@ -11,6 +11,7 @@ interface ThinkingContainerProps {
   states: ReasoningState[];
   isStreaming: boolean;
   hasAnswer: boolean;
+  hasError?: boolean;
   duration_ms?: number;
 }
 
@@ -19,6 +20,7 @@ export function ThinkingContainer({
   states,
   isStreaming,
   hasAnswer,
+  hasError,
   duration_ms,
 }: ThinkingContainerProps) {
   const [userCollapsed, setUserCollapsed] = useState<boolean | null>(null);
@@ -26,8 +28,8 @@ export function ThinkingContainer({
   const hasContent = !!reasoning || states.length > 0;
   if (!hasContent) return null;
 
-  // Automatic: open while streaming; collapse when done. User override wins.
-  const isOpen = userCollapsed !== null ? !userCollapsed : isStreaming;
+  // Automatic: open while streaming or on error; collapse when done. User override wins.
+  const isOpen = userCollapsed !== null ? !userCollapsed : (isStreaming || !!hasError);
 
   function headerLabel() {
     if (isStreaming && !hasAnswer) {
