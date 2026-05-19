@@ -673,6 +673,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   const handleStop = useCallback(() => {
     abortControllerRef.current?.abort();
+    setTimeout(() => inputBarRef.current?.focus(), 0);
   }, []);
 
   // Escape stops generation

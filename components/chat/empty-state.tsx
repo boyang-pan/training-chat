@@ -12,8 +12,8 @@ const EXAMPLE_PROMPTS: { label: string; prompt: string }[] = [
     prompt: "Has my average heart rate at the same pace improved over the last 6 months? Show me the trend.",
   },
   {
-    label: "Best training month?",
-    prompt: "Which was my best training month this year, and why?",
+    label: "Suggest a workout",
+    prompt: "Suggest a workout for today based on my current training load and form.",
   },
   {
     label: "Signs of overtraining?",

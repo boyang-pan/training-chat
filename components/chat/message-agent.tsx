@@ -65,6 +65,7 @@ export const MessageAgent = memo(function MessageAgent({ message, isStreaming, c
         states={message.states}
         isStreaming={isStreaming ?? false}
         hasAnswer={!!message.final_answer}
+        hasError={!!message.error}
         duration_ms={message.duration_ms}
       />
 
