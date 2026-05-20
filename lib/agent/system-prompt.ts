@@ -108,7 +108,6 @@ Strava activity mirror. Always filter by user_id.
 - max_heartrate: float nullable
 - average_speed_mps: float — convert to min/km: 1000/(speed*60)
 - max_speed_mps: float
-- suffer_score: int nullable
 - perceived_exertion: int nullable — 1–10
 - average_watts: float nullable
 - weighted_average_watts: int nullable — normalised power
@@ -152,7 +151,36 @@ One row per segment effort per activity. Use segment_id to group all efforts on 
 - max_heartrate: float nullable
 - average_cadence: float nullable
 - pr_rank: int nullable — 1/2/3 if top-3 personal best at time of activity
-- achievements: jsonb nullable — [{type_id, type, rank}]; use achievements @> '[{"type":"pr"}]' to filter PRs`;
+- achievements: jsonb nullable — [{type_id, type, rank}]; use achievements @> '[{"type":"pr"}]' to filter PRs
+
+### activity_laps
+One row per lap per activity (watch-recorded or manually marked). Not all activities have laps.
+- user_id: uuid — always filter by this
+- activity_id: bigint — FK to activities.id
+- id: bigint — unique Strava lap ID
+- name: text — e.g. "Lap 1"
+- elapsed_time: int — seconds (wall clock)
+- moving_time: int — seconds moving
+- start_date: timestamptz
+- distance: float — meters
+- average_speed: float nullable — m/s; convert to min/km: 1000/(speed*60)
+- max_speed: float nullable — m/s
+- average_heartrate: float nullable
+- max_heartrate: float nullable
+- average_cadence: float nullable
+- average_watts: float nullable
+
+### activity_splits
+One row per 1 km metric split per activity. Only populated for activities with GPS. Use to analyse pace consistency, HR drift, or negative/positive splits.
+- user_id: uuid — always filter by this
+- activity_id: bigint — FK to activities.id
+- split: int — 1-indexed (1 = first km; last split may cover < 1000 m)
+- distance: float — meters covered in this split
+- elapsed_time: int — seconds (wall clock)
+- moving_time: int — seconds moving
+- average_speed: float nullable — m/s; convert to min/km: 1000/(speed*60)
+- average_heartrate: float nullable
+- pace_zone: int nullable — Strava pace zone 1–5`;
 
 // ---- Athlete profile types ----
 

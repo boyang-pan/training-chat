@@ -220,7 +220,7 @@ export function createAgentTools(userId: string) {
 
     get_training_load: tool({
       description:
-        "Computes Chronic Training Load (CTL = fitness), Acute Training Load (ATL = fatigue), Training Stress Balance (TSB = form), and Acute:Chronic Workload Ratio (ACWR = injury risk). Uses suffer_score as the load proxy; falls back to activity duration in minutes for activities without HR data. Returns current values plus a time series suitable for charting with render_chart.",
+        "Computes Chronic Training Load (CTL = fitness), Acute Training Load (ATL = fatigue), Training Stress Balance (TSB = form), and Acute:Chronic Workload Ratio (ACWR = injury risk). Uses activity duration in minutes as the load proxy. Returns current values plus a time series suitable for charting with render_chart.",
       inputSchema: z.object({
         days: z
           .number()
@@ -240,7 +240,7 @@ export function createAgentTools(userId: string) {
 
         const { data, error } = await supabaseAdmin
           .from("activities")
-          .select("start_date, suffer_score, moving_time_seconds")
+          .select("start_date, moving_time_seconds")
           .eq("user_id", userId)
           .gte("start_date", since)
           .order("start_date", { ascending: true });
