@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
-import { ArrowUp, Square } from "lucide-react";
+import { ArrowUp, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -9,15 +9,18 @@ interface InputBarProps {
   onSubmit: (value: string) => void;
   disabled?: boolean;
   onStop?: () => void;
+  onQueue?: (value: string) => void;
+  onClearQueue?: () => void;
+  hasQueuedMessage?: boolean;
   textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
 }
 
-export function InputBar({ onSubmit, disabled, onStop, textareaRef: externalRef }: InputBarProps) {
+export function InputBar({ onSubmit, disabled, onStop, onQueue, onClearQueue, hasQueuedMessage, textareaRef: externalRef }: InputBarProps) {
   const [value, setValue] = useState("");
   const internalRef = useRef<HTMLTextAreaElement>(null);
   const textareaRef = externalRef ?? internalRef;
 
-  // Focus on mount and whenever streaming finishes (disabled: true → false)
+  // Focus when streaming finishes (disabled: true → false)
   const prevDisabled = useRef(disabled);
   useEffect(() => {
     if (prevDisabled.current && !disabled) {
@@ -39,7 +42,14 @@ export function InputBar({ onSubmit, disabled, onStop, textareaRef: externalRef 
 
   function handleSubmit() {
     const trimmed = value.trim();
-    if (!trimmed || disabled) return;
+    if (!trimmed) return;
+    if (disabled && onQueue) {
+      onQueue(trimmed);
+      setValue("");
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
+      return;
+    }
+    if (disabled) return;
     onSubmit(trimmed);
     setValue("");
     if (textareaRef.current) {
@@ -70,14 +80,12 @@ export function InputBar({ onSubmit, disabled, onStop, textareaRef: externalRef 
           adjustHeight();
         }}
         onKeyDown={handleKeyDown}
-        disabled={disabled}
-        placeholder="Ask about your training..."
+        placeholder={disabled ? "Type your next question…" : "Ask about your training..."}
         rows={1}
         className={cn(
           "flex-1 resize-none text-sm bg-transparent outline-none border-0 focus:ring-0",
           "placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-zinc-900 dark:text-zinc-100",
           "min-h-[40px] max-h-[160px] py-2 px-1 leading-relaxed",
-          "disabled:opacity-50"
         )}
       />
       {disabled && onStop ? (
@@ -103,9 +111,25 @@ export function InputBar({ onSubmit, disabled, onStop, textareaRef: externalRef 
         </Button>
       )}
     </div>
-    <p className="text-center text-[11px] text-zinc-400 dark:text-zinc-600 select-none">
-      Training Chat can make mistakes. Double-check responses.
-    </p>
+    {hasQueuedMessage ? (
+      <div className="flex items-center justify-between px-1">
+        <p className="text-[11px] text-zinc-400 dark:text-zinc-500 select-none">
+          1 message queued · will send when done
+        </p>
+        <button
+          onClick={onClearQueue}
+          className="flex items-center gap-0.5 text-[11px] text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+          aria-label="Cancel queued message"
+        >
+          <X className="w-3 h-3" />
+          Cancel
+        </button>
+      </div>
+    ) : (
+      <p className="text-center text-[11px] text-zinc-400 dark:text-zinc-600 select-none">
+        Training Chat can make mistakes. Double-check responses.
+      </p>
+    )}
     </div>
   );
 }
