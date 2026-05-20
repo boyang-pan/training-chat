@@ -32,14 +32,14 @@ function formLabel(tsb: number, acwr: number): string {
 
 /**
  * Computes CTL/ATL/TSB from raw activity records using proper EMA.
+ * Load proxy: activity duration in minutes (moving_time_seconds / 60).
  *
- * @param activities  Raw rows with start_date, suffer_score, moving_time_seconds
+ * @param activities  Raw rows with start_date and moving_time_seconds
  * @param returnDays  How many trailing days to include in the returned series
  */
 export function computeTrainingLoad(
   activities: Array<{
     start_date: string;
-    suffer_score: number | null;
     moving_time_seconds: number;
   }>,
   returnDays: number
@@ -55,7 +55,7 @@ export function computeTrainingLoad(
   const loadByDate = new Map<string, number>();
   for (const act of activities) {
     const date = act.start_date.slice(0, 10); // YYYY-MM-DD
-    const load = act.suffer_score ?? Math.round(act.moving_time_seconds / 60);
+    const load = Math.round(act.moving_time_seconds / 60);
     loadByDate.set(date, (loadByDate.get(date) ?? 0) + load);
   }
 

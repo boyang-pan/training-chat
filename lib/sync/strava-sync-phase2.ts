@@ -28,6 +28,35 @@ interface StravaSegmentEffort {
   achievements?: unknown[];
 }
 
+interface StravaLap {
+  id: number;
+  name: string;
+  elapsed_time: number;
+  moving_time: number;
+  start_date: string;
+  distance: number;
+  start_index?: number;
+  end_index?: number;
+  total_elevation_gain?: number;
+  average_speed?: number;
+  max_speed?: number;
+  average_heartrate?: number | null;
+  max_heartrate?: number | null;
+  average_cadence?: number | null;
+  average_watts?: number | null;
+  device_watts?: boolean | null;
+}
+
+interface StravaSplitMetric {
+  split: number;
+  distance: number;
+  elapsed_time: number;
+  moving_time: number;
+  average_speed?: number;
+  average_heartrate?: number | null;
+  pace_zone?: number | null;
+}
+
 function parseRateLimitUsage(header: string | null): { used: number; limit: number } {
   if (!header) return { used: 0, limit: RATE_LIMIT_15MIN };
   const [used, limit] = header.split(",").map(Number);
@@ -39,8 +68,8 @@ async function fetchDetailedActivity(token: string, activityId: number) {
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  if (res.status === 429) return { error: "rate_limited" as const, rateLimitUsage: null, segmentEfforts: [] };
-  if (!res.ok) return { error: `${res.status}` as const, rateLimitUsage: null, segmentEfforts: [] };
+  if (res.status === 429) return { error: "rate_limited" as const, rateLimitUsage: null, segmentEfforts: [], laps: [], splits: [] };
+  if (!res.ok) return { error: `${res.status}` as const, rateLimitUsage: null, segmentEfforts: [], laps: [], splits: [] };
 
   const data = await res.json();
   return {
@@ -51,6 +80,8 @@ async function fetchDetailedActivity(token: string, activityId: number) {
       description: data.description ?? null,
     },
     segmentEfforts: (data.segment_efforts ?? []) as StravaSegmentEffort[],
+    laps: (data.laps ?? []) as StravaLap[],
+    splits: (data.splits_metric ?? []) as StravaSplitMetric[],
     rateLimitUsage: res.headers.get("X-RateLimit-Usage"),
   };
 }
@@ -190,6 +221,51 @@ export async function syncStravaActivitiesPhase2Batch(
         .from("segment_efforts")
         .upsert(rows, { onConflict: "user_id,id" });
       if (seError) console.warn(`[cron-p2] segment efforts error for activity ${activityId}:`, seError.message);
+    }
+
+    if (result.laps.length > 0) {
+      const lapRows = result.laps.map((l) => ({
+        id: l.id,
+        user_id: userId,
+        activity_id: activityId as number,
+        name: l.name,
+        elapsed_time: l.elapsed_time,
+        moving_time: l.moving_time,
+        start_date: l.start_date,
+        distance: l.distance,
+        start_index: l.start_index ?? null,
+        end_index: l.end_index ?? null,
+        total_elevation_gain: l.total_elevation_gain ?? null,
+        average_speed: l.average_speed ?? null,
+        max_speed: l.max_speed ?? null,
+        average_heartrate: l.average_heartrate ?? null,
+        max_heartrate: l.max_heartrate ?? null,
+        average_cadence: l.average_cadence ?? null,
+        average_watts: l.average_watts ?? null,
+        device_watts: l.device_watts ?? null,
+      }));
+      const { error: lapError } = await supabaseAdmin
+        .from("activity_laps")
+        .upsert(lapRows, { onConflict: "user_id,id" });
+      if (lapError) console.warn(`[cron-p2] laps error for activity ${activityId}:`, lapError.message);
+    }
+
+    if (result.splits.length > 0) {
+      const splitRows = result.splits.map((s) => ({
+        user_id: userId,
+        activity_id: activityId as number,
+        split: s.split,
+        distance: s.distance,
+        elapsed_time: s.elapsed_time,
+        moving_time: s.moving_time,
+        average_speed: s.average_speed ?? null,
+        average_heartrate: s.average_heartrate ?? null,
+        pace_zone: s.pace_zone ?? null,
+      }));
+      const { error: splitError } = await supabaseAdmin
+        .from("activity_splits")
+        .upsert(splitRows, { onConflict: "user_id,activity_id,split" });
+      if (splitError) console.warn(`[cron-p2] splits error for activity ${activityId}:`, splitError.message);
     }
 
     processed++;
@@ -336,6 +412,51 @@ export async function syncStravaActivitiesPhase2(userId: string): Promise<void> 
           .from("segment_efforts")
           .upsert(rows, { onConflict: "user_id,id" });
         if (seError) console.warn(`[sync-p2] segment efforts error for activity ${activityId}:`, seError.message);
+      }
+
+      if (result.laps.length > 0) {
+        const lapRows = result.laps.map((l) => ({
+          id: l.id,
+          user_id: userId,
+          activity_id: activityId as number,
+          name: l.name,
+          elapsed_time: l.elapsed_time,
+          moving_time: l.moving_time,
+          start_date: l.start_date,
+          distance: l.distance,
+          start_index: l.start_index ?? null,
+          end_index: l.end_index ?? null,
+          total_elevation_gain: l.total_elevation_gain ?? null,
+          average_speed: l.average_speed ?? null,
+          max_speed: l.max_speed ?? null,
+          average_heartrate: l.average_heartrate ?? null,
+          max_heartrate: l.max_heartrate ?? null,
+          average_cadence: l.average_cadence ?? null,
+          average_watts: l.average_watts ?? null,
+          device_watts: l.device_watts ?? null,
+        }));
+        const { error: lapError } = await supabaseAdmin
+          .from("activity_laps")
+          .upsert(lapRows, { onConflict: "user_id,id" });
+        if (lapError) console.warn(`[sync-p2] laps error for activity ${activityId}:`, lapError.message);
+      }
+
+      if (result.splits.length > 0) {
+        const splitRows = result.splits.map((s) => ({
+          user_id: userId,
+          activity_id: activityId as number,
+          split: s.split,
+          distance: s.distance,
+          elapsed_time: s.elapsed_time,
+          moving_time: s.moving_time,
+          average_speed: s.average_speed ?? null,
+          average_heartrate: s.average_heartrate ?? null,
+          pace_zone: s.pace_zone ?? null,
+        }));
+        const { error: splitError } = await supabaseAdmin
+          .from("activity_splits")
+          .upsert(splitRows, { onConflict: "user_id,activity_id,split" });
+        if (splitError) console.warn(`[sync-p2] splits error for activity ${activityId}:`, splitError.message);
       }
 
       synced++;

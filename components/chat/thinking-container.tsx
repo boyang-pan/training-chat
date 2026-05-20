@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Brain, ChevronDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ReasoningStateRow } from "@/components/chat/reasoning-state";
@@ -24,17 +24,31 @@ export function ThinkingContainer({
   duration_ms,
 }: ThinkingContainerProps) {
   const [userCollapsed, setUserCollapsed] = useState<boolean | null>(null);
+  const [streamJustEnded, setStreamJustEnded] = useState(false);
+
+  useEffect(() => {
+    if (isStreaming) {
+      setStreamJustEnded(false);
+      return;
+    }
+    setStreamJustEnded(true);
+    const t = setTimeout(() => setStreamJustEnded(false), 1000);
+    return () => clearTimeout(t);
+  }, [isStreaming]);
 
   const hasContent = !!reasoning || states.length > 0;
   if (!hasContent) return null;
 
-  // Automatic: open while streaming or on error; collapse when done. User override wins.
-  const isOpen = userCollapsed !== null ? !userCollapsed : (isStreaming || !!hasError);
+  // Automatic: open while streaming, for 1s after it ends, or on error. User override wins.
+  const isOpen = userCollapsed !== null ? !userCollapsed : (isStreaming || streamJustEnded || !!hasError);
 
   function headerLabel() {
     if (isStreaming && !hasAnswer) {
       const activeState = states.find((s) => s.status === "active");
       return activeState?.label ?? "Thinking";
+    }
+    if (isStreaming && hasAnswer) {
+      return "Writing response…";
     }
     const toolCount = states.filter((s) => s.id !== "planning" && s.toolCall).length;
     const timeStr = duration_ms ? ` · ${Math.round(duration_ms / 1000)}s` : "";
@@ -49,7 +63,7 @@ export function ThinkingContainer({
         onClick={() => setUserCollapsed(isOpen)}
         className="flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors mb-1.5"
       >
-        {isStreaming && !hasAnswer ? (
+        {isStreaming ? (
           <Loader2 className="w-3 h-3 animate-spin" />
         ) : (
           <ChevronDown

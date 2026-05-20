@@ -220,6 +220,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [queuedMessage, setQueuedMessage] = useState<string | null>(null);
   const shouldAutoScrollRef = useRef(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastQuestionRef = useRef<string>("");
@@ -673,8 +674,18 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   const handleStop = useCallback(() => {
     abortControllerRef.current?.abort();
+    setQueuedMessage(null);
     setTimeout(() => inputBarRef.current?.focus(), 0);
   }, []);
+
+  // Auto-submit queued message when streaming ends
+  useEffect(() => {
+    if (!isLoading && queuedMessage) {
+      const msg = queuedMessage;
+      setQueuedMessage(null);
+      handleSubmit(msg);
+    }
+  }, [isLoading, queuedMessage, handleSubmit]);
 
   // Escape stops generation
   useEffect(() => {
@@ -835,7 +846,16 @@ export function ChatView({ conversationId }: ChatViewProps) {
       {/* Input */}
       <div className="border-t border-zinc-100 dark:border-zinc-800 p-4 shrink-0">
         <div className="max-w-3xl mx-auto">
-          <InputBar key={conversationId ?? "new"} onSubmit={handleSubmit} disabled={isLoading} onStop={handleStop} textareaRef={inputBarRef} />
+          <InputBar
+            key={conversationId ?? "new"}
+            onSubmit={handleSubmit}
+            disabled={isLoading}
+            onStop={handleStop}
+            onQueue={setQueuedMessage}
+            onClearQueue={() => setQueuedMessage(null)}
+            hasQueuedMessage={!!queuedMessage}
+            textareaRef={inputBarRef}
+          />
 
         </div>
       </div>

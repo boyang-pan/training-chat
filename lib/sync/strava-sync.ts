@@ -21,7 +21,6 @@ interface StravaActivitySummary {
   max_heartrate?: number;
   average_speed: number;
   max_speed: number;
-  suffer_score?: number;
   perceived_exertion?: number;
   average_watts?: number;
   weighted_average_watts?: number;
@@ -67,7 +66,6 @@ function mapActivity(userId: string, a: StravaActivitySummary) {
     max_heartrate: a.max_heartrate ?? null,
     average_speed_mps: a.average_speed,
     max_speed_mps: a.max_speed,
-    suffer_score: a.suffer_score ?? null,
     perceived_exertion: a.perceived_exertion ?? null,
     average_watts: a.average_watts ?? null,
     weighted_average_watts: a.weighted_average_watts ?? null,
@@ -85,7 +83,6 @@ async function computePersonalRecords(userId: string) {
     { metric: "longest_ride",         column: "distance_meters",   type: "Ride" },
     { metric: "fastest_run_pace",     column: "average_speed_mps", type: "Run",  minDistance: 1000 },
     { metric: "highest_elevation_run",column: "elevation_gain_meters", type: "Run" },
-    { metric: "highest_suffer_score", column: "suffer_score",      requireNotNull: "suffer_score" },
   ];
 
   for (const rec of records) {
