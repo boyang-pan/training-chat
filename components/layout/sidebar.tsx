@@ -274,7 +274,8 @@ function SyncCard({ onViewDetails }: { onViewDetails: () => void }) {
   useEffect(() => {
     if (!data) return;
     const anyRunning = data.phase1?.status === "running" || data.phase2?.status === "running";
-    if (!anyRunning) return;
+    const anyFailed = data.phase1?.status === "failed" || data.phase2?.status === "failed";
+    if (!anyRunning && !anyFailed) return;
     const id = setInterval(fetchStatus, 5000);
     return () => clearInterval(id);
   }, [data]);
