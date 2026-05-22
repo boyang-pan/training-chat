@@ -36,8 +36,10 @@ Two-phase approach per user turn:
 | `0:` | `"text delta"` | Append to `final_answer` |
 | `9:` / `b:` | `{"toolName":"...", "args":{...}}` | Add "active" `ReasoningState` |
 | `a:` | `{"result": [...]}` | Mark last active state "done"; store tool output; if `render_chart`, store `ChartPayload` |
+| `r:` | `"reasoning chunk"` | Append to `AgentMessage.reasoning` (extended thinking) |
 | `e:` | `{"message":"..."}` | Set `error: true`, put message in `final_answer` |
 | `d:` | `{}` | Stream complete |
+| `f:` | `{"followups":[...]}` | Set follow-up suggestions; arrives **after** `d:` — bypasses RAF batching, updates immediately |
 
 `AgentMessage.final_answer` must never be empty string before persisting — an empty string causes Anthropic API errors in subsequent turns when included in history. A guard in `handleSubmit` fills it with a fallback error message if empty.
 
@@ -52,7 +54,7 @@ Two-phase approach per user turn:
 | `get_personal_records()` | Pre-computed PRs from `personal_records` table. |
 | `get_notes(start_date?, end_date?)` | User notes from `activity_notes` (cross-session memory). |
 | `add_note(content, activity_id?, note_date?)` | Write a note. Only with explicit user confirmation. |
-| `get_training_load(days?)` | Computes CTL/ATL/TSB/ACWR via EMA. Uses `suffer_score`; falls back to `moving_time_seconds / 60` when HR data is absent. Returns `{ current, series[] }`. |
+| `get_training_load(days?)` | Computes CTL/ATL/TSB/ACWR via EMA. Uses `moving_time_seconds / 60` (duration in minutes) as the load proxy. Returns `{ current, series[] }`. |
 | `render_chart(...)` | Emits a `ChartPayload` for the frontend to render. Must always be followed by text analysis. |
 | `ask_user(question)` | Clarifying question mid-reasoning. Used sparingly. |
 
@@ -78,6 +80,7 @@ Key tables:
 - **Message persistence:** fire-and-forget `POST /api/conversations/[id]/messages` after the stream ends. Both user and assistant messages are inserted sequentially (to preserve `created_at` order).
 - **Title generation:** fire-and-forget `POST /api/title` after the first turn. `conversations.title` is `null` until then.
 - **Supabase client** (`lib/supabase/client.ts`): uses a `Proxy` for lazy initialization. Use `supabaseAdmin` (service role) for server-side agent tool execution.
+- **Type checking:** `npx tsc --noEmit` is faster than `npm run build` for type-only checks. `npm run build` fails in sandboxed environments due to Google Fonts network access.
 
 ## Environment Variables
 

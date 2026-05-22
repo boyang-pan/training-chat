@@ -84,7 +84,7 @@ function syncStatusCallout(data: SyncData): { text: string; variant: "info" | "s
   if (p1Running) return { text: "Importing your activity history — basic queries will be available once this completes.", variant: "info" };
   if (p1Done && p2RateLimited) return { text: "Strava's daily API limit has been reached — enrichment will resume automatically tomorrow.", variant: "error" };
   if (p1Done && p2Stale) return { text: "Enrichment paused — resuming automatically, or click \"Resume sync\" to process a batch now.", variant: "error" };
-  if (p1Done && p2ActivelyRunning) return { text: "Basic data is ready — try asking about your runs or weekly mileage. Calories, power, and segments are on their way.", variant: "info" };
+  if (p1Done && p2ActivelyRunning) return { text: "Basic data is ready — try asking about your runs or weekly mileage. Calories, power, segments, laps, and splits are on their way.", variant: "info" };
   if (p1Done && !p2) return { text: "Activity summaries imported. Enrichment starting shortly…", variant: "info" };
   return null;
 }
@@ -827,10 +827,10 @@ function DataSection() {
 
         <SyncPhaseDetail
           title="Phase 2 — Enrichment"
-          includes="Calories, max power, description, segment times, PR rank, power and HR per segment"
+          includes="Calories, max power, description, segment times, PR rank, power and HR per segment, laps, splits"
           job={data?.phase2 ?? null}
           waiting={!!data?.phase1}
-          rateLimitTip="Strava limits API requests to 100 per 15 minutes and 1,000 per day. Phase 2 fetches one request per activity, so 1,000 activities takes ~2.5 hours. Segment efforts are extracted from the same requests at no extra cost."
+          rateLimitTip="Strava limits API requests to 100 per 15 minutes and 1,000 per day. Phase 2 fetches one request per activity, so 1,000 activities takes ~2.5 hours. Segment efforts, laps, and splits are all extracted from the same requests at no extra cost."
         />
 
         {data?.phase1?.status === "completed" && (() => {
