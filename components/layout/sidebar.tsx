@@ -425,6 +425,23 @@ export function Sidebar({ conversations, isLoadingConversations, activeId, onSel
                 </>
               )}
 
+              {groups.yesterday.length > 0 && (
+                <>
+                  <GroupLabel label="Yesterday" />
+                  {groups.yesterday.map((c) => (
+                    <ConversationItem
+                      key={c.id}
+                      conversation={c}
+                      isActive={c.id === activeId}
+                      onSelect={() => onSelect(c.id)}
+                      onDelete={() => onDelete(c.id)}
+                      onRename={(title) => onRename(c.id, title)}
+                      onPin={onPin ? (p) => onPin(c.id, p) : undefined}
+                    />
+                  ))}
+                </>
+              )}
+
               {groups.thisWeek.length > 0 && (
                 <>
                   <GroupLabel label="This week" />

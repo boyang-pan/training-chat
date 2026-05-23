@@ -74,6 +74,10 @@ export function SidebarWrapper() {
   }, []);
 
   async function handleNew() {
+    if (!activeId) {
+      document.querySelector<HTMLTextAreaElement>("textarea")?.focus();
+      return;
+    }
     const res = await fetch("/api/conversations", { method: "POST" });
     const data = await res.json();
     if (data?.id) {
