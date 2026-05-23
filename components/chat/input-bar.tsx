@@ -12,11 +12,13 @@ interface InputBarProps {
   onQueue?: (value: string) => void;
   onClearQueue?: () => void;
   hasQueuedMessage?: boolean;
+  initialValue?: string;
+  onDraftChange?: (value: string) => void;
   textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
 }
 
-export function InputBar({ onSubmit, disabled, onStop, onQueue, onClearQueue, hasQueuedMessage, textareaRef: externalRef }: InputBarProps) {
-  const [value, setValue] = useState("");
+export function InputBar({ onSubmit, disabled, onStop, onQueue, onClearQueue, hasQueuedMessage, initialValue, onDraftChange, textareaRef: externalRef }: InputBarProps) {
+  const [value, setValue] = useState(initialValue ?? "");
   const internalRef = useRef<HTMLTextAreaElement>(null);
   const textareaRef = externalRef ?? internalRef;
 
@@ -46,6 +48,7 @@ export function InputBar({ onSubmit, disabled, onStop, onQueue, onClearQueue, ha
     if (disabled && onQueue) {
       onQueue(trimmed);
       setValue("");
+      onDraftChange?.("");
       if (textareaRef.current) textareaRef.current.style.height = "auto";
       return;
     }
@@ -78,6 +81,7 @@ export function InputBar({ onSubmit, disabled, onStop, onQueue, onClearQueue, ha
         onChange={(e) => {
           setValue(e.target.value);
           adjustHeight();
+          onDraftChange?.(e.target.value);
         }}
         onKeyDown={handleKeyDown}
         placeholder={disabled ? "Type your next question…" : "Ask about your training..."}

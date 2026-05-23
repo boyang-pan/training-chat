@@ -52,9 +52,11 @@ export function relativeTime(dateStr: string): string {
 /** Group conversations by recency */
 export function groupByRecency<T extends { created_at: string }>(
   items: T[]
-): { today: T[]; thisWeek: T[]; earlier: T[] } {
+): { today: T[]; yesterday: T[]; thisWeek: T[]; earlier: T[] } {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfToday.getDate() - 1);
   const startOfWeek = new Date(startOfToday);
   startOfWeek.setDate(startOfToday.getDate() - startOfToday.getDay());
 
@@ -63,6 +65,8 @@ export function groupByRecency<T extends { created_at: string }>(
       const date = new Date(item.created_at);
       if (date >= startOfToday) {
         acc.today.push(item);
+      } else if (date >= startOfYesterday) {
+        acc.yesterday.push(item);
       } else if (date >= startOfWeek) {
         acc.thisWeek.push(item);
       } else {
@@ -70,6 +74,6 @@ export function groupByRecency<T extends { created_at: string }>(
       }
       return acc;
     },
-    { today: [] as T[], thisWeek: [] as T[], earlier: [] as T[] }
+    { today: [] as T[], yesterday: [] as T[], thisWeek: [] as T[], earlier: [] as T[] }
   );
 }

@@ -235,6 +235,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const conversationsRef = useRef<Conversation[]>([]);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const inputBarRef = useRef<HTMLTextAreaElement>(null);
+  const draftsRef = useRef<Map<string, string>>(new Map());
   // Tracks a conversation ID we just created ourselves so the reset
   // effect below doesn't wipe messages when the URL updates to the new ID
   const selfCreatedIdRef = useRef<string | null>(null);
@@ -424,6 +425,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
       const agentMsgId = newId();
 
       lastQuestionRef.current = question;
+      draftsRef.current.delete(conversationId ?? "new");
       shouldAutoScrollRef.current = true;
       setShowScrollButton(false);
       setMessages((prev) => [
@@ -848,12 +850,14 @@ export function ChatView({ conversationId }: ChatViewProps) {
         <div className="max-w-3xl mx-auto">
           <InputBar
             key={conversationId ?? "new"}
+            initialValue={draftsRef.current.get(conversationId ?? "new") ?? ""}
             onSubmit={handleSubmit}
             disabled={isLoading}
             onStop={handleStop}
             onQueue={setQueuedMessage}
             onClearQueue={() => setQueuedMessage(null)}
             hasQueuedMessage={!!queuedMessage}
+            onDraftChange={(v) => draftsRef.current.set(conversationId ?? "new", v)}
             textareaRef={inputBarRef}
           />
 
