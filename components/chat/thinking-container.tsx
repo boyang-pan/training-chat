@@ -86,7 +86,7 @@ export function ThinkingContainer({
         <div className="overflow-hidden">
           {reasoning && (
             <div className="border-l-2 border-zinc-200 dark:border-zinc-700 pl-3 mb-2">
-              <p className="text-xs text-zinc-400 dark:text-zinc-500 leading-relaxed whitespace-pre-wrap">
+              <p className="text-xs text-zinc-400 dark:text-zinc-500 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
                 {reasoning}
               </p>
             </div>

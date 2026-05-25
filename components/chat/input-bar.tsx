@@ -35,6 +35,10 @@ export function InputBar({ onSubmit, disabled, onStop, onQueue, onClearQueue, ha
     textareaRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    adjustHeight();
+  }, []);
+
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current;
     if (!el) return;
