@@ -6,6 +6,7 @@ import { MessageAgent } from "@/components/chat/message-agent";
 import { InputBar } from "@/components/chat/input-bar";
 import { EmptyState } from "@/components/chat/empty-state";
 import type { AgentMessage, Conversation, Message } from "@/types";
+import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/layout/resizable-layout";
 import { PanelLeftOpen, Pencil, ChevronDown, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -767,20 +768,21 @@ export function ChatView({ conversationId }: ChatViewProps) {
       </div>
 
       {/* Scroll-to-bottom button */}
-      {showScrollButton && (
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-10">
-          <button
-            onClick={() => {
-              if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-              shouldAutoScrollRef.current = true;
-              setShowScrollButton(false);
-            }}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors"
-          >
-            <ChevronDown className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+      <div className={cn(
+        "absolute bottom-24 left-1/2 -translate-x-1/2 z-10 transition-opacity duration-200",
+        showScrollButton ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+      )}>
+        <button
+          onClick={() => {
+            if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            shouldAutoScrollRef.current = true;
+            setShowScrollButton(false);
+          }}
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors"
+        >
+          <ChevronDown className="w-4 h-4" />
+        </button>
+      </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto" ref={scrollRef}>

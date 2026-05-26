@@ -163,7 +163,7 @@ export const MessageAgent = memo(function MessageAgent({ message, isStreaming, c
           </div>
 
           {!isStreaming && !message.error && (
-            <div className="flex items-center justify-between mt-1.5 h-4 opacity-0 group-hover/answer:opacity-100 transition-opacity">
+            <div className="flex items-center justify-between mt-1.5 h-4 opacity-30 group-hover/answer:opacity-100 transition-opacity">
               {time ? (
                 <span className="text-[11px] text-zinc-400 dark:text-zinc-500 select-none">{time}</span>
               ) : <span />}
