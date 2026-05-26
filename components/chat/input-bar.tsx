@@ -134,9 +134,14 @@ export function InputBar({ onSubmit, disabled, onStop, onQueue, onClearQueue, ha
         </button>
       </div>
     ) : (
-      <p className="text-center text-[11px] text-zinc-400 dark:text-zinc-600 select-none">
-        Training Chat can make mistakes. Double-check responses.
-      </p>
+      <div className="flex items-center justify-between px-1">
+        <p className="text-[11px] text-zinc-400 dark:text-zinc-600 select-none">
+          Training Chat can make mistakes. Double-check responses.
+        </p>
+        <p className="text-[11px] text-zinc-400 dark:text-zinc-600 select-none">
+          ⌘↵ send · ⇧↵ newline
+        </p>
+      </div>
     )}
     </div>
   );

@@ -32,7 +32,7 @@ export function ThinkingContainer({
       return;
     }
     setStreamJustEnded(true);
-    const t = setTimeout(() => setStreamJustEnded(false), 1000);
+    const t = setTimeout(() => setStreamJustEnded(false), 2000);
     return () => clearTimeout(t);
   }, [isStreaming]);
 

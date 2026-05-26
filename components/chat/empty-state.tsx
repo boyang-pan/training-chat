@@ -34,7 +34,9 @@ export function EmptyState({ onPrompt }: EmptyStateProps) {
         <p className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
           Ask about your training
         </p>
-
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Analyze your workouts with AI
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-2 max-w-sm w-full">
