@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { Check, ChevronDown, Copy, Dot, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { ReasoningState } from "@/types";
 
@@ -97,6 +98,7 @@ function SqlBlock({ sql }: { sql: string }) {
   function handleCopy() {
     navigator.clipboard.writeText(ref.current?.textContent ?? "");
     setCopied(true);
+    toast.success("Copied");
     setTimeout(() => setCopied(false), 2000);
   }
   return (
