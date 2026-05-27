@@ -221,8 +221,10 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [queuedMessage, setQueuedMessage] = useState<string | null>(null);
   const shouldAutoScrollRef = useRef(true);
+  const newMsgIdsRef = useRef<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastQuestionRef = useRef<string>("");
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -290,6 +292,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
     setMessages([]);
     setConversationTitle(null);
     setHasTitleBeenSet(false);
+    newMsgIdsRef.current.clear();
+    setUnreadCount(0);
 
     if (!conversationId) return;
 
@@ -406,6 +410,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
       const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
       shouldAutoScrollRef.current = nearBottom;
       setShowScrollButton(!nearBottom);
+      if (nearBottom) setUnreadCount(0);
     }
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
@@ -425,10 +430,15 @@ export function ChatView({ conversationId }: ChatViewProps) {
       const userMsgId = newId();
       const agentMsgId = newId();
 
+      const userWasScrolledAway = !shouldAutoScrollRef.current;
+
       lastQuestionRef.current = question;
       draftsRef.current.delete(conversationId ?? "new");
       shouldAutoScrollRef.current = true;
       setShowScrollButton(false);
+      if (userWasScrolledAway) setUnreadCount((c) => c + 1);
+      newMsgIdsRef.current.add(userMsgId);
+      newMsgIdsRef.current.add(agentMsgId);
       setMessages((prev) => [
         ...prev,
         { id: userMsgId, role: "user", content: question },
@@ -777,10 +787,16 @@ export function ChatView({ conversationId }: ChatViewProps) {
             if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
             shouldAutoScrollRef.current = true;
             setShowScrollButton(false);
+            setUnreadCount(0);
           }}
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors"
+          className="relative flex items-center justify-center w-8 h-8 rounded-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors"
         >
           <ChevronDown className="w-4 h-4" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[10px] font-medium flex items-center justify-center leading-none">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
         </button>
       </div>
 
@@ -815,11 +831,13 @@ export function ChatView({ conversationId }: ChatViewProps) {
         ) : (
           <div className="max-w-3xl mx-auto px-6 py-6">
             {messages.map((msg) => {
+              const isNew = newMsgIdsRef.current.has(msg.id);
               if (msg.role === "user") {
                 return (
                   <MessageUser
                     key={msg.id}
                     content={msg.content as string}
+                    isNew={isNew}
                     createdAt={msg.createdAt}
                   />
                 );
@@ -829,6 +847,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
                   key={msg.id}
                   message={msg.content as AgentMessage}
                   isStreaming={streamingMsgId === msg.id}
+                  isNew={isNew}
                   createdAt={msg.createdAt}
                   onRetry={
                     msg.id === lastAgentMsgId && (msg.content as AgentMessage).error

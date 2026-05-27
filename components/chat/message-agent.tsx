@@ -2,6 +2,7 @@
 
 import { useState, useRef, memo } from "react";
 import { Copy, Check, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ThinkingContainer } from "@/components/chat/thinking-container";
@@ -14,6 +15,7 @@ import type { AgentMessage } from "@/types";
 interface MessageAgentProps {
   message: AgentMessage;
   isStreaming?: boolean;
+  isNew?: boolean;
   createdAt?: string;
   onRetry?: () => void;
   onFollowup?: (question: string) => void;
@@ -25,6 +27,7 @@ function PreBlock({ children }: { children: React.ReactNode }) {
   function handleCopy() {
     navigator.clipboard.writeText(ref.current?.textContent ?? "");
     setCopied(true);
+    toast.success("Copied");
     setTimeout(() => setCopied(false), 2000);
   }
   return (
@@ -46,7 +49,7 @@ function PreBlock({ children }: { children: React.ReactNode }) {
   );
 }
 
-export const MessageAgent = memo(function MessageAgent({ message, isStreaming, createdAt, onRetry, onFollowup }: MessageAgentProps) {
+export const MessageAgent = memo(function MessageAgent({ message, isStreaming, isNew, createdAt, onRetry, onFollowup }: MessageAgentProps) {
   const [copied, setCopied] = useState(false);
   const time = createdAt
     ? new Date(createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
@@ -55,11 +58,12 @@ export const MessageAgent = memo(function MessageAgent({ message, isStreaming, c
   function handleCopy() {
     navigator.clipboard.writeText(message.final_answer ?? "");
     setCopied(true);
+    toast.success("Copied");
     setTimeout(() => setCopied(false), 2000);
   }
 
   return (
-    <div className="mb-6">
+    <div className={cn("mb-6", isNew && "animate-in fade-in slide-in-from-bottom-2 duration-500")}>
       <ThinkingContainer
         reasoning={message.reasoning}
         states={message.states}
@@ -195,11 +199,12 @@ export const MessageAgent = memo(function MessageAgent({ message, isStreaming, c
       {/* Follow-up suggestions */}
       {!isStreaming && !message.error && message.followups && message.followups.length > 0 && onFollowup && (
         <div className="flex flex-wrap gap-2 mt-3">
-          {message.followups.map((q) => (
+          {message.followups.map((q, i) => (
             <button
               key={q}
               onClick={() => onFollowup(q)}
-              className="text-xs px-3 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+              style={{ animationDelay: `${i * 60}ms`, animationFillMode: "both" }}
+              className="text-xs px-3 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors animate-in fade-in slide-in-from-bottom-1 duration-300"
             >
               {q}
             </button>
