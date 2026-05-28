@@ -96,7 +96,7 @@ function ConversationItem({
       {/* Main select button */}
       <button
         onClick={onSelect}
-        className="flex-1 min-w-0 text-left px-3 py-2 overflow-hidden"
+        className="flex-1 min-w-0 text-left px-3 py-2 overflow-hidden transition-transform active:scale-[0.98]"
       >
         {isEditing ? (
           <input

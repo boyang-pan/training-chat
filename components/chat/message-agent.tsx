@@ -204,7 +204,7 @@ export const MessageAgent = memo(function MessageAgent({ message, isStreaming, i
               key={q}
               onClick={() => onFollowup(q)}
               style={{ animationDelay: `${i * 60}ms`, animationFillMode: "both" }}
-              className="text-xs px-3 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors animate-in fade-in slide-in-from-bottom-1 duration-300"
+              className="text-xs px-3 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 hover:shadow-sm hover:scale-105 active:scale-[0.97] transition-all animate-in fade-in slide-in-from-bottom-1 duration-300"
             >
               {q}
             </button>
