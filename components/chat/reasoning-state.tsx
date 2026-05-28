@@ -15,7 +15,7 @@ export function ReasoningStateRow({ state }: ReasoningStateRowProps) {
   const canExpand = state.status !== "pending" && state.toolCall !== undefined;
 
   return (
-    <div className="border border-zinc-100 dark:border-zinc-800 rounded-md overflow-hidden">
+    <div className="border border-zinc-100 dark:border-zinc-800 rounded-md overflow-hidden animate-in fade-in slide-in-from-left-2 duration-300">
       {/* Header row */}
       <button
         onClick={() => canExpand && setIsOpen((o) => !o)}

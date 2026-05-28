@@ -75,8 +75,8 @@ export function InputBar({ onSubmit, disabled, onStop, onQueue, onClearQueue, ha
     <div className="space-y-1.5">
     <div
       className={cn(
-        "border border-zinc-200 dark:border-zinc-700 rounded-lg flex items-center gap-2 p-2 transition-colors",
-        "focus-within:border-zinc-400 dark:focus-within:border-zinc-500"
+        "border border-zinc-200 dark:border-zinc-700 rounded-lg flex items-center gap-2 p-2 transition-all",
+        "focus-within:border-zinc-400 dark:focus-within:border-zinc-500 focus-within:shadow-sm focus-within:shadow-zinc-300/40 dark:focus-within:shadow-zinc-600/20"
       )}
     >
       <textarea
@@ -113,7 +113,12 @@ export function InputBar({ onSubmit, disabled, onStop, onQueue, onClearQueue, ha
           size="icon"
           onClick={handleSubmit}
           disabled={!value.trim() || disabled}
-          className="shrink-0 h-8 w-8 text-zinc-400 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-30"
+          className={cn(
+            "shrink-0 h-8 w-8 disabled:opacity-30 transition-colors",
+            value.trim() && !disabled
+              ? "text-zinc-700 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-50"
+              : "text-zinc-400 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+          )}
         >
           <ArrowUp className="w-4 h-4" />
         </Button>
