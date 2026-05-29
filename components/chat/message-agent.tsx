@@ -49,6 +49,129 @@ function PreBlock({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Shared markdown component config — reused across all text chunks in renderContent
+const MARKDOWN_COMPONENTS = {
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed mb-3 last:mb-0">{children}</p>
+  ),
+  ul: ({ children }: { children?: React.ReactNode }) => (
+    <ul className="text-sm text-zinc-800 dark:text-zinc-200 list-disc pl-4 mb-3 space-y-1">{children}</ul>
+  ),
+  ol: ({ children }: { children?: React.ReactNode }) => (
+    <ol className="text-sm text-zinc-800 dark:text-zinc-200 list-decimal pl-4 mb-3 space-y-1">{children}</ol>
+  ),
+  li: ({ children }: { children?: React.ReactNode }) => (
+    <li className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed">{children}</li>
+  ),
+  strong: ({ children }: { children?: React.ReactNode }) => (
+    <strong className="font-semibold text-zinc-900 dark:text-zinc-100">{children}</strong>
+  ),
+  em: ({ children }: { children?: React.ReactNode }) => (
+    <em className="italic">{children}</em>
+  ),
+  h1: ({ children }: { children?: React.ReactNode }) => (
+    <h1 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-2 mt-4 first:mt-0">{children}</h1>
+  ),
+  h2: ({ children }: { children?: React.ReactNode }) => (
+    <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2 mt-4 first:mt-0">{children}</h2>
+  ),
+  h3: ({ children }: { children?: React.ReactNode }) => (
+    <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-1 mt-3 first:mt-0">{children}</h3>
+  ),
+  code: ({ children, className }: { children?: React.ReactNode; className?: string }) => {
+    if (className?.includes("language-")) return <>{children}</>;
+    return (
+      <code className="text-xs bg-zinc-100 dark:bg-zinc-800 rounded px-1 py-0.5 font-mono text-zinc-700 dark:text-zinc-300">{children}</code>
+    );
+  },
+  pre: ({ children }: { children?: React.ReactNode }) => <PreBlock>{children}</PreBlock>,
+  hr: () => <hr className="border-zinc-200 dark:border-zinc-700 my-3" />,
+  table: ({ children }: { children?: React.ReactNode }) => (
+    <div className="overflow-x-auto mb-3">
+      <table className="w-full text-sm border-collapse">{children}</table>
+    </div>
+  ),
+  thead: ({ children }: { children?: React.ReactNode }) => (
+    <thead className="border-b border-zinc-200 dark:border-zinc-700">{children}</thead>
+  ),
+  tbody: ({ children }: { children?: React.ReactNode }) => <tbody>{children}</tbody>,
+  tr: ({ children }: { children?: React.ReactNode }) => (
+    <tr className="border-b border-zinc-100 dark:border-zinc-800 last:border-0">{children}</tr>
+  ),
+  th: ({ children }: { children?: React.ReactNode }) => (
+    <th className="text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide py-2 pr-4 first:pl-0">{children}</th>
+  ),
+  td: ({ children }: { children?: React.ReactNode }) => (
+    <td className="text-sm text-zinc-800 dark:text-zinc-200 py-1.5 pr-4 first:pl-0 whitespace-nowrap">{children}</td>
+  ),
+};
+
+function mdChunk(text: string, key: string) {
+  return (
+    <ReactMarkdown key={key} remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+      {text}
+    </ReactMarkdown>
+  );
+}
+
+// Regex matching all marker variants: [CHART], [WORKOUT_1], [SEGMENT]
+const MARKER_RE = /\[CHART\]|\[WORKOUT_(\d+)\]|\[SEGMENT\]/g;
+// Matches a partial marker that may be split across stream chunks
+const PARTIAL_MARKER_RE = /\[(?:CHART|WORKOUT(?:_\d*)?|SEGMENT)?$/;
+
+function renderContent(message: AgentMessage, isStreaming: boolean): React.ReactNode[] {
+  let text = message.final_answer ?? "";
+
+  // During streaming, strip any partial marker at the end to avoid flashing "[CHAR" etc.
+  if (isStreaming) {
+    text = text.replace(PARTIAL_MARKER_RE, "");
+  }
+
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let hasAnyMarker = false;
+  MARKER_RE.lastIndex = 0;
+
+  let match: RegExpExecArray | null;
+  while ((match = MARKER_RE.exec(text)) !== null) {
+    hasAnyMarker = true;
+
+    // Text before this marker
+    if (match.index > lastIndex) {
+      nodes.push(mdChunk(text.slice(lastIndex, match.index), `t-${lastIndex}`));
+    }
+
+    // Render the visualization in-place
+    const raw = match[0];
+    if (raw === "[CHART]" && message.chart) {
+      nodes.push(<ChartBlock key="chart" chart={message.chart} />);
+    } else if (raw.startsWith("[WORKOUT_")) {
+      const idx = parseInt(match[1] ?? "1", 10) - 1;
+      const w = message.workouts?.[idx];
+      if (w) nodes.push(<WorkoutBlock key={`w-${idx}`} workout={w} />);
+    } else if (raw === "[SEGMENT]" && message.segment) {
+      nodes.push(<SegmentBlock key="segment" segment={message.segment} />);
+    }
+
+    lastIndex = match.index + raw.length;
+  }
+
+  // Remaining text after the last marker
+  if (lastIndex < text.length) {
+    nodes.push(mdChunk(text.slice(lastIndex), `t-${lastIndex}`));
+  }
+
+  // Fallback: AI didn't include markers — render text first, then visuals below
+  if (!hasAnyMarker) {
+    if (text) nodes.push(mdChunk(text, "text"));
+    if (message.chart) nodes.push(<ChartBlock key="chart" chart={message.chart} />);
+    message.workouts?.forEach((w, i) => nodes.push(<WorkoutBlock key={`w-${i}`} workout={w} />));
+    if (message.segment) nodes.push(<SegmentBlock key="segment" segment={message.segment} />);
+  }
+
+  return nodes;
+}
+
 export const MessageAgent = memo(function MessageAgent({ message, isStreaming, isNew, createdAt, onRetry, onFollowup }: MessageAgentProps) {
   const [copied, setCopied] = useState(false);
   const time = createdAt
@@ -73,15 +196,6 @@ export const MessageAgent = memo(function MessageAgent({ message, isStreaming, i
         duration_ms={message.duration_ms}
       />
 
-      {/* Chart */}
-      {message.chart && <ChartBlock chart={message.chart} />}
-
-      {/* Workouts */}
-      {message.workouts?.map((w, i) => <WorkoutBlock key={i} workout={w} />)}
-
-      {/* Segment */}
-      {message.segment && <SegmentBlock segment={message.segment} />}
-
       {/* Pulsing indicator while streaming with no answer yet */}
       {isStreaming && !message.final_answer && (
         <div className="flex items-center gap-1 py-1">
@@ -91,72 +205,11 @@ export const MessageAgent = memo(function MessageAgent({ message, isStreaming, i
         </div>
       )}
 
-      {/* Final answer */}
+      {/* Answer with visualizations embedded inline at marker positions */}
       {message.final_answer && (
         <div className="group/answer relative">
-          <div
-            className="prose-answer"
-          >
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                p: ({ children }) => (
-                  <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed mb-3 last:mb-0">{children}</p>
-                ),
-                ul: ({ children }) => (
-                  <ul className="text-sm text-zinc-800 dark:text-zinc-200 list-disc pl-4 mb-3 space-y-1">{children}</ul>
-                ),
-                ol: ({ children }) => (
-                  <ol className="text-sm text-zinc-800 dark:text-zinc-200 list-decimal pl-4 mb-3 space-y-1">{children}</ol>
-                ),
-                li: ({ children }) => (
-                  <li className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed">{children}</li>
-                ),
-                strong: ({ children }) => (
-                  <strong className="font-semibold text-zinc-900 dark:text-zinc-100">{children}</strong>
-                ),
-                em: ({ children }) => (
-                  <em className="italic">{children}</em>
-                ),
-                h1: ({ children }) => (
-                  <h1 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-2 mt-4 first:mt-0">{children}</h1>
-                ),
-                h2: ({ children }) => (
-                  <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2 mt-4 first:mt-0">{children}</h2>
-                ),
-                h3: ({ children }) => (
-                  <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-1 mt-3 first:mt-0">{children}</h3>
-                ),
-                code: ({ children, className }) => {
-                  if (className?.includes("language-")) return <>{children}</>;
-                  return (
-                    <code className="text-xs bg-zinc-100 dark:bg-zinc-800 rounded px-1 py-0.5 font-mono text-zinc-700 dark:text-zinc-300">{children}</code>
-                  );
-                },
-                pre: ({ children }) => <PreBlock>{children}</PreBlock>,
-                hr: () => <hr className="border-zinc-200 dark:border-zinc-700 my-3" />,
-                table: ({ children }) => (
-                  <div className="overflow-x-auto mb-3">
-                    <table className="w-full text-sm border-collapse">{children}</table>
-                  </div>
-                ),
-                thead: ({ children }) => (
-                  <thead className="border-b border-zinc-200 dark:border-zinc-700">{children}</thead>
-                ),
-                tbody: ({ children }) => <tbody>{children}</tbody>,
-                tr: ({ children }) => (
-                  <tr className="border-b border-zinc-100 dark:border-zinc-800 last:border-0">{children}</tr>
-                ),
-                th: ({ children }) => (
-                  <th className="text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide py-2 pr-4 first:pl-0">{children}</th>
-                ),
-                td: ({ children }) => (
-                  <td className="text-sm text-zinc-800 dark:text-zinc-200 py-1.5 pr-4 first:pl-0 whitespace-nowrap">{children}</td>
-                ),
-              }}
-            >
-              {message.final_answer}
-            </ReactMarkdown>
+          <div className="prose-answer">
+            {renderContent(message, isStreaming ?? false)}
             {isStreaming && (
               <span className="inline-flex items-center gap-0.5 ml-1 mb-1">
                 <span className="w-1 h-1 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-bounce [animation-delay:0ms]" />

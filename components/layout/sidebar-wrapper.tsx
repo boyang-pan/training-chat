@@ -6,6 +6,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { Sidebar } from "@/components/layout/sidebar";
 import { AccountModal } from "@/components/layout/account-modal";
 import { SearchModal } from "@/components/layout/search-modal";
+import { KeyboardShortcutsModal } from "@/components/layout/keyboard-shortcuts-modal";
 import type { Conversation } from "@/types";
 
 export function SidebarWrapper() {
@@ -14,6 +15,7 @@ export function SidebarWrapper() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -101,6 +103,11 @@ export function SidebarWrapper() {
         e.preventDefault();
         setIsSearchOpen(true);
       }
+      const tag = (e.target as HTMLElement).tagName;
+      if (e.key === "?" && tag !== "INPUT" && tag !== "TEXTAREA") {
+        e.preventDefault();
+        setIsShortcutsOpen(true);
+      }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
@@ -185,6 +192,10 @@ export function SidebarWrapper() {
         onClose={() => setIsSearchOpen(false)}
         conversations={conversations}
         onSelect={handleSelect}
+      />
+      <KeyboardShortcutsModal
+        open={isShortcutsOpen}
+        onOpenChange={setIsShortcutsOpen}
       />
     </>
   );
