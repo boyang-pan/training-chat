@@ -9,6 +9,7 @@ import type { AgentMessage, Conversation, Message } from "@/types";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/layout/resizable-layout";
 import { PanelLeftOpen, Pencil, ChevronDown, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
@@ -331,7 +332,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
         loadedConversationCache.current.set(conversationId, loaded);
         if (loaded.length > 0) setHasTitleBeenSet(true);
       })
-      .catch(() => {})
+      .catch(() => { toast.error("Failed to load messages."); })
       .finally(() => setIsLoadingHistory(false));
   }, [conversationId]);
 
@@ -379,7 +380,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: trimmed }),
-    }).catch(() => {});
+    }).catch(() => { toast.error("Failed to save title."); });
   }
 
   function handleTitleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -424,11 +425,12 @@ export function ChatView({ conversationId }: ChatViewProps) {
   }, [messages]);
 
   const handleSubmit = useCallback(
-    async (question: string) => {
+    async (question: string, baseMessages?: LocalMessage[]) => {
       if (isLoading) return;
 
       const userMsgId = newId();
       const agentMsgId = newId();
+      const historySource = baseMessages ?? messages;
 
       const userWasScrolledAway = !shouldAutoScrollRef.current;
 
@@ -439,13 +441,20 @@ export function ChatView({ conversationId }: ChatViewProps) {
       if (userWasScrolledAway) setUnreadCount((c) => c + 1);
       newMsgIdsRef.current.add(userMsgId);
       newMsgIdsRef.current.add(agentMsgId);
-      setMessages((prev) => [
-        ...prev,
-        { id: userMsgId, role: "user", content: question },
-      ]);
+      if (baseMessages !== undefined) {
+        setMessages([
+          ...baseMessages,
+          { id: userMsgId, role: "user", content: question },
+        ]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          { id: userMsgId, role: "user", content: question },
+        ]);
+      }
       setIsLoading(true);
 
-      const history = messages.slice(-10).map((m) => ({
+      const history = historySource.slice(-10).map((m) => ({
         role: m.role,
         content:
           typeof m.content === "string"
@@ -477,7 +486,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
           selfCreatedIdRef.current = convId;
           router.replace(`/chat/${convId}`);
         } catch {
-          // Non-fatal — messages just won't persist
+          toast.error("Failed to start conversation. Messages may not persist.");
         }
       }
 
@@ -488,7 +497,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
       // Seed the per-conversation cache so navigation away doesn't lose this stream
       if (convId) {
         streamCacheRef.current.set(convId, [
-          ...messages,
+          ...historySource,
           { id: userMsgId, role: "user", content: question },
           { id: agentMsgId, role: "assistant", content: initialAgentMsg },
         ]);
@@ -654,6 +663,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
           );
         } else {
           console.error("Agent stream error:", err);
+          toast.error("Something went wrong. Please try again.");
           currentAgentMsg = {
             states: [],
             final_answer: "Something went wrong. Please try again.",
@@ -723,6 +733,15 @@ export function ChatView({ conversationId }: ChatViewProps) {
     await fetch(`/api/conversations/${conversationId}`, { method: "DELETE" }).catch(() => {});
     router.push("/chat");
   }
+
+  const handleEditMessage = useCallback(
+    (messageId: string, newContent: string) => {
+      const idx = messages.findIndex((m) => m.id === messageId);
+      if (idx === -1) return;
+      handleSubmit(newContent, messages.slice(0, idx));
+    },
+    [messages, handleSubmit]
+  );
 
   return (
     <div className="relative flex flex-col h-full">
@@ -839,6 +858,8 @@ export function ChatView({ conversationId }: ChatViewProps) {
                     content={msg.content as string}
                     isNew={isNew}
                     createdAt={msg.createdAt}
+                    onEdit={(newContent) => handleEditMessage(msg.id, newContent)}
+                    isStreaming={isLoading}
                   />
                 );
               }
