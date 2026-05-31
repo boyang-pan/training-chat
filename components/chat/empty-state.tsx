@@ -40,7 +40,7 @@ interface EmptyStateProps {
 
 export function EmptyState({ onPrompt }: EmptyStateProps) {
   const [visible, setVisible] = useState(false);
-  const [prompts, setPrompts] = useState<PromptItem[] | "loading" | null>("loading");
+  const [prompts, setPrompts] = useState<PromptItem[]>(FALLBACK_PROMPTS);
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => setVisible(true));
@@ -51,26 +51,15 @@ export function EmptyState({ onPrompt }: EmptyStateProps) {
     const cached = readCache();
     if (cached) setPrompts(cached);
 
-    // Only set fallback timeout when there's no cached data to show
-    const timeout = cached ? undefined : setTimeout(() => setPrompts(null), 2000);
-
     fetch("/api/suggested-prompts")
       .then((r) => r.json())
       .then((d) => {
-        if (timeout !== undefined) clearTimeout(timeout);
         if (Array.isArray(d.prompts) && d.prompts.length >= 4) {
           writeCache(d.prompts);
           setPrompts(d.prompts.slice(0, 4).map((q: string) => ({ label: q, prompt: q })));
-        } else if (!cached) {
-          setPrompts(null);
         }
       })
-      .catch(() => {
-        if (timeout !== undefined) clearTimeout(timeout);
-        if (!cached) setPrompts(null);
-      });
-
-    return () => { if (timeout !== undefined) clearTimeout(timeout); };
+      .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -98,39 +87,20 @@ export function EmptyState({ onPrompt }: EmptyStateProps) {
         </p>
       </div>
 
-      {prompts === "loading" && visible && (
-        <p className="text-[11px] text-zinc-400 dark:text-zinc-500 -mt-2">
-          Personalizing for you
-          <span className="animate-bounce inline-block ml-0.5 [animation-delay:0ms]">.</span>
-          <span className="animate-bounce inline-block [animation-delay:150ms]">.</span>
-          <span className="animate-bounce inline-block [animation-delay:300ms]">.</span>
-        </p>
-      )}
-
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-sm w-full">
-        {prompts === "loading" ? (
-          [0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className={cn(
-                "animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded-md h-[38px] transition-opacity duration-500",
-                visible ? "opacity-100" : "opacity-0"
-              )}
-              style={{ transitionDelay: visible ? `${200 + i * 75}ms` : "0ms" }}
-            />
-          ))
-        ) : (
-          (prompts ?? FALLBACK_PROMPTS).map(({ label, prompt }, i) => (
-            <button
-              key={label}
-              onClick={() => onPrompt(prompt)}
-              style={{ animationDelay: `${i * 60}ms`, animationFillMode: "both" }}
-              className="animate-in fade-in slide-in-from-bottom-1 duration-300 border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer text-left"
-            >
-              {label}
-            </button>
-          ))
-        )}
+        {prompts.map(({ label, prompt }, i) => (
+          <button
+            key={i}
+            onClick={() => onPrompt(prompt)}
+            style={{ transitionDelay: visible ? `${200 + i * 75}ms` : "0ms" }}
+            className={cn(
+              "border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer text-left transition-all duration-500",
+              visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+            )}
+          >
+            {label}
+          </button>
+        ))}
       </div>
     </div>
   );
