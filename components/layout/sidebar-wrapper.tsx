@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+import { toast } from "sonner";
 import { Sidebar } from "@/components/layout/sidebar";
 import { AccountModal } from "@/components/layout/account-modal";
 import { SearchModal } from "@/components/layout/search-modal";
@@ -80,16 +81,32 @@ export function SidebarWrapper() {
       document.querySelector<HTMLTextAreaElement>("textarea")?.focus();
       return;
     }
-    const res = await fetch("/api/conversations", { method: "POST" });
-    const data = await res.json();
-    if (data?.id) {
-      const newConv = { id: data.id, title: null, created_at: new Date().toISOString() };
+
+    const id = crypto.randomUUID();
+    const newConv = { id, title: null, created_at: new Date().toISOString() };
+
+    // Navigate immediately with optimistic sidebar entry
+    setConversations((prev) => {
+      const updated = [newConv, ...prev];
+      window.dispatchEvent(new CustomEvent("conversations:updated", { detail: updated }));
+      return updated;
+    });
+    router.push(`/chat/${id}`);
+
+    // Create DB record in background
+    const res = await fetch("/api/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    if (!res.ok) {
       setConversations((prev) => {
-        const updated = [newConv, ...prev];
+        const updated = prev.filter((c) => c.id !== id);
         window.dispatchEvent(new CustomEvent("conversations:updated", { detail: updated }));
         return updated;
       });
-      router.push(`/chat/${data.id}`);
+      router.push("/chat");
+      toast.error("Failed to create conversation.");
     }
   }
 

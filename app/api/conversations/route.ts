@@ -16,13 +16,19 @@ export async function GET() {
   return Response.json(data);
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   const user = await getAuthUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
+  let providedId: string | undefined;
+  try {
+    const body = await request.json();
+    if (typeof body?.id === "string" && body.id.length > 0) providedId = body.id;
+  } catch {}
+
   const { data, error } = await supabaseAdmin
     .from("conversations")
-    .insert({ user_id: user.id, title: null })
+    .insert({ user_id: user.id, title: null, ...(providedId ? { id: providedId } : {}) })
     .select()
     .single();
 
