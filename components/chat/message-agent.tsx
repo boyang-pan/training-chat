@@ -157,7 +157,7 @@ function renderContent(message: AgentMessage, isStreaming: boolean): React.React
   }
 
   // Remaining text after the last marker
-  if (lastIndex < text.length) {
+  if (hasAnyMarker && lastIndex < text.length) {
     nodes.push(mdChunk(text.slice(lastIndex), `t-${lastIndex}`));
   }
 
