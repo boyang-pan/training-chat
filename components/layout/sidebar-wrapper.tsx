@@ -193,6 +193,7 @@ export function SidebarWrapper() {
         onLogout={handleLogout}
         onOpenModal={(tab) => { setModalTab(tab); setModalOpen(true); }}
         onOpenSearch={() => setIsSearchOpen(true)}
+        onOpenShortcuts={() => setIsShortcutsOpen(true)}
         onPin={handlePin}
       />
       {userEmail && (
