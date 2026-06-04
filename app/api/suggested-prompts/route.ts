@@ -62,12 +62,19 @@ export async function GET() {
 
     const { text } = await generateText({
       model: anthropic("claude-haiku-4-5-20251001"),
-      prompt: `You are generating starter questions for an athlete's AI training coach.
+      prompt: `You are generating starter questions for an AI training coach.
 
 Athlete:
 ${context}
 
-Generate exactly 4 short questions (under 60 characters each) this athlete would find most useful to ask right now about their Strava training data. Be specific and concrete. Output ONLY a JSON array of 4 strings.`,
+Generate exactly 4 short, clickable questions (under 60 characters each) a user would tap to start a conversation about their training data.
+
+Rules:
+- If current form is Tired or Very Tired, lean toward recovery/rest questions
+- If current form is Fresh or Optimal, lean toward performance or goal-progress questions
+- Cover at least 2 different aspects (e.g. recent performance, trends, recovery, goal progress)
+- Be specific and concrete — no generic advice questions
+- Output ONLY a JSON array of 4 strings`,
       maxOutputTokens: 200,
     });
 
